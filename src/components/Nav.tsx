@@ -8,11 +8,15 @@ import { alternarTema, estaOscuro } from '@/lib/tema'
 
 const ROL: Record<string, string> = { admin: 'Administrador', agente: 'Agente', usuario: 'Usuario' }
 
-interface Solapa {
+interface Pagina {
   href: string
   label: string
+}
+interface Solapa extends Pagina {
   // rutas que también pertenecen a esta solapa
   tambien?: string[]
+  // páginas de la solapa: se muestran en una segunda fila, como en Accusys Cyber
+  paginas?: Pagina[]
 }
 
 function iniciales(nombre: string) {
@@ -21,6 +25,8 @@ function iniciales(nombre: string) {
   return ((p[0]?.[0] ?? '') + (p.length > 1 ? p[p.length - 1][0] : p[0]?.[1] ?? '')).toUpperCase() || '?'
 }
 
+const dentro = (pathname: string, ruta: string) => pathname === ruta || pathname.startsWith(ruta + '/')
+
 export default function Nav({ nombre, email, rol }: { nombre: string; email: string; rol: string }) {
   const pathname = usePathname()
   const staff = rol !== 'usuario'
@@ -28,16 +34,48 @@ export default function Nav({ nombre, email, rol }: { nombre: string; email: str
   const solapas: Solapa[] = staff
     ? [
         { href: '/agente', label: 'Bandeja', tambien: ['/tickets'] },
-        { href: '/tablero', label: 'Tablero' },
-        { href: '/kb', label: 'Base de conocimiento' },
-        ...(rol === 'admin' ? [{ href: '/admin', label: 'Administración' }] : []),
+        {
+          href: '/tablero',
+          label: 'Tablero',
+          paginas: [
+            { href: '/tablero', label: 'Situación actual' },
+            { href: '/tablero/reportes', label: 'Reportes por período' },
+          ],
+        },
+        {
+          href: '/kb',
+          label: 'Conocimiento',
+          tambien: ['/plantillas'],
+          paginas: [
+            { href: '/kb', label: 'Artículos' },
+            { href: '/plantillas', label: 'Respuestas predefinidas' },
+          ],
+        },
+        ...(rol === 'admin'
+          ? [
+              {
+                href: '/admin',
+                label: 'Administración',
+                paginas: [
+                  { href: '/admin', label: 'General' },
+                  { href: '/admin/categorias', label: 'Categorías' },
+                  { href: '/admin/organizaciones', label: 'Organizaciones' },
+                  { href: '/admin/personas', label: 'Personas' },
+                  { href: '/admin/programados', label: 'Programados' },
+                  { href: '/admin/auditoria', label: 'Auditoría' },
+                ],
+              },
+            ]
+          : []),
       ]
     : [
         { href: '/portal', label: 'Mis tickets', tambien: ['/tickets'] },
         { href: '/kb', label: 'Ayuda' },
       ]
 
-  const activa = solapas.find((s) => [s.href, ...(s.tambien ?? [])].some((r) => pathname === r || pathname.startsWith(r + '/')))
+  const activa = solapas.find((s) => [s.href, ...(s.tambien ?? [])].some((r) => dentro(pathname, r)))
+  // La página actual es la de ruta más larga que coincide (así /admin no queda marcada estando en /admin/personas).
+  const paginaActual = [...(activa?.paginas ?? [])].sort((a, b) => b.href.length - a.href.length).find((p) => dentro(pathname, p.href))
 
   return (
     <header className="border-b border-line/[0.06] bg-surface print:hidden">
@@ -75,6 +113,28 @@ export default function Nav({ nombre, email, rol }: { nombre: string; email: str
           <MenuUsuario nombre={nombre || email} email={email} rol={rol} />
         </div>
       </div>
+
+      {activa?.paginas && (
+        <nav className="border-t border-line/[0.06] bg-canvas" aria-label={`Páginas de ${activa.label}`}>
+          <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 py-2 sm:px-6">
+            {activa.paginas.map((p) => {
+              const actual = p === paginaActual
+              return (
+                <Link
+                  key={p.href}
+                  href={p.href}
+                  aria-current={actual ? 'page' : undefined}
+                  className={`whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    actual ? 'bg-surface text-brand-700 shadow-sm' : 'text-ink/60 hover:bg-surface/60 hover:text-ink'
+                  }`}
+                >
+                  {p.label}
+                </Link>
+              )
+            })}
+          </div>
+        </nav>
+      )}
     </header>
   )
 }
@@ -120,6 +180,11 @@ function MenuUsuario({ nombre, email, rol }: { nombre: string; email: string; ro
             <p className="truncate text-xs text-ink/50">{email}</p>
             <p className="mt-0.5 text-xs text-ink/50">{ROL[rol] ?? rol}</p>
           </div>
+          {rol !== 'usuario' && (
+            <Link href="/portal" onClick={() => setAbierto(false)} className="mt-1 block rounded-md px-2.5 py-1.5 text-sm text-ink/70 hover:bg-line/[0.04] hover:text-ink">
+              Mis pedidos y aprobaciones
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => setOscuro(alternarTema())}
@@ -128,9 +193,7 @@ function MenuUsuario({ nombre, email, rol }: { nombre: string; email: string; ro
             {oscuro ? 'Pasar a modo claro' : 'Pasar a modo oscuro'}
           </button>
           <form action="/auth/salir" method="post">
-            <button className="block w-full rounded-md px-2.5 py-1.5 text-left text-sm text-ink/70 hover:bg-line/[0.04] hover:text-ink">
-              Cerrar sesión
-            </button>
+            <button className="block w-full rounded-md px-2.5 py-1.5 text-left text-sm text-ink/70 hover:bg-line/[0.04] hover:text-ink">Cerrar sesión</button>
           </form>
         </div>
       )}
