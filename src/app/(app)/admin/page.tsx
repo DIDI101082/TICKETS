@@ -20,13 +20,13 @@ export default async function Admin() {
     <div className="space-y-8">
       <div>
         <h1>Administración</h1>
-        <p className="text-sm text-black/60">Sectores, tiempos de SLA y permisos de las personas.</p>
+        <p className="text-sm text-ink/60">Sectores, tiempos de SLA y permisos de las personas.</p>
       </div>
 
       <section className="space-y-3">
         <div>
           <h2>Sectores</h2>
-          <p className="text-sm text-black/60">
+          <p className="text-sm text-ink/60">
             La descripción es lo que lee la IA para decidir a dónde derivar: cuanto más concreta, mejor deriva.
           </p>
         </div>
@@ -37,12 +37,12 @@ export default async function Admin() {
               <textarea name="descripcion" defaultValue={s.descripcion} rows={2} className="campo" aria-label="Descripción" />
               <input name="orden" type="number" defaultValue={s.orden} className="campo" aria-label="Orden" />
               <label className="flex items-center gap-1.5 py-2 text-sm">
-                <input type="checkbox" name="activo" defaultChecked={s.activo} className="accent-marca" /> Activo
+                <input type="checkbox" name="activo" defaultChecked={s.activo} className="accent-brand-600" /> Activo
               </label>
               <button className="btn-sec">Guardar</button>
             </form>
           ))}
-          <form action={guardarSector.bind(null, null)} className="grid gap-3 rounded-lg border border-dashed border-black/20 p-3 md:grid-cols-[11rem_1fr_4.5rem_auto] md:items-start">
+          <form action={guardarSector.bind(null, null)} className="grid gap-3 rounded-lg border border-dashed border-line/20 p-3 md:grid-cols-[11rem_1fr_4.5rem_auto] md:items-start">
             <input name="nombre" required placeholder="Nuevo sector" className="campo" />
             <textarea name="descripcion" rows={2} placeholder="Qué tipo de pedidos atiende" className="campo" />
             <input name="orden" type="number" defaultValue={sectores.length + 1} className="campo" aria-label="Orden" />
@@ -54,12 +54,12 @@ export default async function Admin() {
       <section className="space-y-3">
         <div>
           <h2>Tiempos de SLA</h2>
-          <p className="text-sm text-black/60">
+          <p className="text-sm text-ink/60">
             En minutos, corridos (24×7). El reloj de resolución se pausa mientras el ticket está En espera. Los cambios aplican a tickets nuevos o cuando se cambia la prioridad.
           </p>
         </div>
         <form action={guardarSla} className="tarjeta overflow-x-auto">
-          <table className="tabla">
+          <table className="tabla data">
             <thead>
               <tr>
                 <th>Prioridad</th>
@@ -76,7 +76,7 @@ export default async function Admin() {
                     <td className="font-medium">{p.etiqueta}</td>
                     <td><input name={`resp_${p.valor}`} type="number" min={1} defaultValue={v?.minutos_respuesta} className="campo w-28" /></td>
                     <td><input name={`resol_${p.valor}`} type="number" min={1} defaultValue={v?.minutos_resolucion} className="campo w-28" /></td>
-                    <td className="text-black/55">{v ? `${duracion(v.minutos_respuesta)} / ${duracion(v.minutos_resolucion)}` : '—'}</td>
+                    <td className="text-ink/55">{v ? `${duracion(v.minutos_respuesta)} / ${duracion(v.minutos_resolucion)}` : '—'}</td>
                   </tr>
                 )
               })}
@@ -91,7 +91,7 @@ export default async function Admin() {
       <section className="space-y-3">
         <div>
           <h2>Personas</h2>
-          <p className="text-sm text-black/60">
+          <p className="text-sm text-ink/60">
             Quien se registra entra como usuario externo. Acá lo pasás a agente o administrador, lo marcás como interno y le asignás sectores.
           </p>
         </div>
@@ -100,7 +100,7 @@ export default async function Admin() {
             <form key={u.id} action={guardarUsuario.bind(null, u.id)} className="tarjeta grid gap-3 p-3 lg:grid-cols-[14rem_8rem_8rem_10rem_1fr_auto] lg:items-center">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{u.nombre || '—'}</p>
-                <p className="truncate text-xs text-black/50">{u.email}</p>
+                <p className="truncate text-xs text-ink/50">{u.email}</p>
               </div>
               <select name="rol" defaultValue={u.rol} disabled={u.id === yo.id} className="campo" aria-label="Rol">
                 <option value="usuario">Usuario</option>
@@ -121,7 +121,7 @@ export default async function Admin() {
                         name="sectores"
                         value={s.id}
                         defaultChecked={asignados.some((a) => a.perfil_id === u.id && a.sector_id === s.id)}
-                        className="accent-marca"
+                        className="accent-brand-600"
                       />
                       {s.nombre}
                     </label>

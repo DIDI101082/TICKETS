@@ -2,48 +2,102 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------- Tema: claro (por defecto) y oscuro — igual que Accusys Cyber ----------
+   Los colores base son variables (R G B). Tailwind los usa como ink, line, surface y canvas. */
+:root {
+  color-scheme: light;
+  --c-canvas: 245 247 251; /* fondo de la página */
+  --c-surface: 255 255 255; /* tarjetas, menús, campos */
+  --c-ink: 15 17 21; /* texto */
+  --c-line: 0 0 0; /* bordes y sombreados suaves */
+}
+
+html.dark {
+  color-scheme: dark;
+  --c-canvas: 13 16 21;
+  --c-surface: 22 27 34;
+  --c-ink: 226 230 237;
+  --c-line: 255 255 255;
+}
+
 @layer base {
   body {
-    @apply bg-papel text-tinta antialiased;
-    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    @apply bg-canvas text-ink antialiased;
   }
   h1 {
-    @apply text-2xl font-semibold tracking-tight;
+    @apply font-display text-2xl font-bold text-ink;
   }
   h2 {
-    @apply text-base font-semibold;
+    @apply font-display text-base font-bold;
   }
 }
 
 @layer components {
   .tarjeta {
-    @apply rounded-lg border border-black/10 bg-white;
+    @apply rounded-xl border border-line/[0.06] bg-surface shadow-sm;
+  }
+  .btn-base {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:opacity-50;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md bg-marca px-3.5 py-2 text-sm font-medium text-white transition hover:bg-marca-oscuro focus:outline-none focus-visible:ring-2 focus-visible:ring-marca focus-visible:ring-offset-2 disabled:opacity-50;
+    @apply btn-base bg-brand-600 text-white hover:bg-brand-700;
   }
   .btn-sec {
-    @apply inline-flex items-center justify-center gap-2 rounded-md border border-black/15 bg-white px-3.5 py-2 text-sm font-medium text-tinta transition hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-marca disabled:opacity-50;
+    @apply btn-base border border-line/10 bg-surface text-ink hover:bg-line/[0.03];
   }
   .campo {
-    @apply block w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm text-tinta placeholder:text-black/35 focus:border-marca focus:outline-none focus:ring-1 focus:ring-marca;
+    @apply block w-full rounded-lg border border-line/10 bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink/35 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/40;
   }
   .rotulo {
-    @apply mb-1 block text-xs font-medium uppercase tracking-wide text-black/55;
+    @apply mb-1 block text-sm font-medium text-ink/70;
+  }
+  .pill {
+    @apply inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium;
   }
   .insignia {
-    @apply inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium;
+    @apply pill;
   }
   .tabla {
-    @apply w-full text-left text-sm;
+    @apply w-full text-left;
   }
   .tabla th {
-    @apply border-b border-black/10 px-3 py-2 text-xs font-medium uppercase tracking-wide text-black/50;
+    @apply border-b border-line/[0.06] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ink/50;
   }
   .tabla td {
-    @apply border-b border-black/5 px-3 py-2.5 align-middle;
+    @apply border-b border-line/[0.04] px-4 py-3 align-middle text-sm;
   }
   .tabla tbody tr:hover {
-    @apply bg-black/[0.025];
+    @apply bg-line/[0.02];
   }
 }
+
+/* ---------- Modo oscuro: los fondos pastel se vuelven translúcidos y el texto más claro ---------- */
+html.dark .bg-red-50 { background-color: rgb(239 68 68 / 0.16); }
+html.dark .bg-emerald-50 { background-color: rgb(16 185 129 / 0.16); }
+html.dark .bg-brand-50,
+html.dark .bg-brand-50\/60 { background-color: rgb(59 130 246 / 0.18); }
+html.dark .bg-violet-50 { background-color: rgb(139 92 246 / 0.18); }
+html.dark .bg-sky-50 { background-color: rgb(14 165 233 / 0.18); }
+html.dark .bg-orange-50 { background-color: rgb(249 115 22 / 0.16); }
+html.dark .bg-amber-50,
+html.dark .bg-amber-500\/10 { background-color: rgb(245 158 11 / 0.16); }
+html.dark .border-amber-300 { border-color: rgb(245 158 11 / 0.4); }
+html.dark .text-red-700,
+html.dark .text-red-800 { color: rgb(248 113 113); }
+html.dark .text-emerald-700,
+html.dark .text-emerald-800,
+html.dark .text-emerald-900 { color: rgb(52 211 153); }
+html.dark .text-amber-700,
+html.dark .text-amber-800,
+html.dark .text-amber-900 { color: rgb(251 191 36); }
+html.dark .text-orange-700 { color: rgb(251 146 60); }
+html.dark .text-violet-700 { color: rgb(167 139 250); }
+html.dark .text-sky-700 { color: rgb(56 189 248); }
+html.dark .text-brand-600,
+html.dark .text-brand-700,
+html.dark .hover\:text-brand-600:hover { color: rgb(147 180 252); }
+html.dark .border-brand-500 { border-color: rgb(96 140 250); }
+html.dark .shadow-sm { box-shadow: 0 1px 2px rgb(0 0 0 / 0.5); }
+
+/* Logo: en oscuro se muestra en blanco */
+html.dark .marca { filter: brightness(0) invert(1); }

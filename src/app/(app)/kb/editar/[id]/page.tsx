@@ -18,7 +18,7 @@ export default async function Editar({ params }: { params: Promise<{ id: string 
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <Link href={a ? `/kb/${a.id}` : '/kb'} className="text-sm text-black/50 hover:text-tinta">
+      <Link href={a ? `/kb/${a.id}` : '/kb'} className="text-sm text-ink/50 hover:text-ink">
         ← Volver
       </Link>
       <h1>{nuevo ? 'Nuevo artículo' : 'Editar artículo'}</h1>
@@ -45,12 +45,12 @@ export default async function Editar({ params }: { params: Promise<{ id: string 
         <div>
           <label className="rotulo" htmlFor="contenido">Contenido</label>
           <textarea id="contenido" name="contenido" rows={16} defaultValue={a?.contenido} className="campo font-mono text-[13px]" />
-          <p className="mt-1 text-xs text-black/45">
+          <p className="mt-1 text-xs text-ink/45">
             Formato simple: # Título, ## Subtítulo, - viñetas, 1. pasos numerados, **negrita**, [texto](https://enlace).
           </p>
         </div>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="publicado" defaultChecked={a?.publicado ?? false} className="accent-marca" />
+          <input type="checkbox" name="publicado" defaultChecked={a?.publicado ?? false} className="accent-brand-600" />
           Publicado (si no, queda como borrador visible solo para el equipo)
         </label>
         <button className="btn">Guardar</button>

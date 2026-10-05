@@ -18,20 +18,20 @@ export default async function Portal() {
     <div className="space-y-5">
       <div>
         <h1>Mis tickets</h1>
-        <p className="text-sm text-black/60">Tus pedidos y el estado de cada uno.</p>
+        <p className="text-sm text-ink/60">Tus pedidos y el estado de cada uno.</p>
       </div>
 
       {tickets.length === 0 ? (
         <div className="tarjeta p-8 text-center">
           <p className="font-medium">Todavía no cargaste ningún pedido.</p>
-          <p className="mt-1 text-sm text-black/60">Contanos qué necesitás y lo derivamos al sector que corresponde.</p>
+          <p className="mt-1 text-sm text-ink/60">Contanos qué necesitás y lo derivamos al sector que corresponde.</p>
           <Link href="/portal/nuevo" className="btn mt-4">
             Cargar un ticket
           </Link>
         </div>
       ) : (
         <div className="tarjeta overflow-x-auto">
-          <table className="tabla">
+          <table className="tabla data">
             <thead>
               <tr>
                 <th>N.º</th>
@@ -43,16 +43,16 @@ export default async function Portal() {
             <tbody>
               {tickets.map((t) => (
                 <tr key={t.id}>
-                  <td className="text-black/50">#{t.numero}</td>
+                  <td className="text-ink/50">#{t.numero}</td>
                   <td>
-                    <Link href={`/tickets/${t.id}`} className="font-medium hover:text-marca hover:underline">
+                    <Link href={`/tickets/${t.id}`} className="font-medium hover:text-brand-600 hover:underline">
                       {t.asunto}
                     </Link>
                   </td>
                   <td>
                     <InsigniaEstado estado={t.estado} />
                   </td>
-                  <td className="whitespace-nowrap text-black/60">{fecha(t.actualizado_en)}</td>
+                  <td className="whitespace-nowrap text-ink/60">{fecha(t.actualizado_en)}</td>
                 </tr>
               ))}
             </tbody>

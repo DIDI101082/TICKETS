@@ -67,7 +67,7 @@ export default async function Bandeja({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1>Bandeja</h1>
-          <p className="text-sm text-black/60">{tickets.length} tickets · ordenados por prioridad y antigüedad</p>
+          <p className="text-sm text-ink/60">{tickets.length} tickets · ordenados por prioridad y antigüedad</p>
         </div>
         <form className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="vista" value={vista} />
@@ -88,12 +88,12 @@ export default async function Bandeja({
         </form>
       </div>
 
-      <nav className="flex flex-wrap gap-1 border-b border-black/10 text-sm">
+      <nav className="flex flex-wrap gap-1 border-b border-line/10 text-sm">
         {VISTAS.map((v) => (
           <Link
             key={v.valor}
             href={enlace(v.valor)}
-            className={`-mb-px border-b-2 px-3 py-2 ${vista === v.valor ? 'border-marca font-medium text-marca' : 'border-transparent text-black/55 hover:text-tinta'}`}
+            className={`-mb-px border-b-2 px-3 py-2 ${vista === v.valor ? 'border-brand-500 font-medium text-brand-600' : 'border-transparent text-ink/55 hover:text-ink'}`}
           >
             {v.texto}
           </Link>
@@ -101,10 +101,10 @@ export default async function Bandeja({
       </nav>
 
       {tickets.length === 0 ? (
-        <p className="tarjeta p-8 text-center text-sm text-black/60">No hay tickets en esta vista.</p>
+        <p className="tarjeta p-8 text-center text-sm text-ink/60">No hay tickets en esta vista.</p>
       ) : (
         <div className="tarjeta overflow-x-auto">
-          <table className="tabla">
+          <table className="tabla data">
             <thead>
               <tr>
                 <th>N.º</th>
@@ -122,20 +122,20 @@ export default async function Bandeja({
                 const sla = t.primera_respuesta_en || t.resuelto_en ? slaResolucion(t) : slaRespuesta(t)
                 return (
                   <tr key={t.id}>
-                    <td className="text-black/50">#{t.numero}</td>
+                    <td className="text-ink/50">#{t.numero}</td>
                     <td className="max-w-xs">
-                      <Link href={`/tickets/${t.id}`} className="block truncate font-medium hover:text-marca hover:underline">
+                      <Link href={`/tickets/${t.id}`} className="block truncate font-medium hover:text-brand-600 hover:underline">
                         {t.asunto}
                       </Link>
-                      <span className="block truncate text-xs text-black/50">{t.solicitante_nombre || t.solicitante_email}</span>
+                      <span className="block truncate text-xs text-ink/50">{t.solicitante_nombre || t.solicitante_email}</span>
                     </td>
                     <td><InsigniaPrioridad prioridad={t.prioridad} /></td>
                     <td><InsigniaEstado estado={t.estado} /></td>
                     <td>{t.sector_id ? nombreSector.get(t.sector_id) : <span className="font-medium text-amber-700">Triage</span>}</td>
-                    <td className="text-black/70">{t.asignado_id ? nombreAgente.get(t.asignado_id) ?? '—' : '—'}</td>
-                    <td className="whitespace-nowrap text-black/60">{hace(t.creado_en)}</td>
+                    <td className="text-ink/70">{t.asignado_id ? nombreAgente.get(t.asignado_id) ?? '—' : '—'}</td>
+                    <td className="whitespace-nowrap text-ink/60">{hace(t.creado_en)}</td>
                     <td>
-                      <span className="mr-1 text-xs text-black/40">{t.primera_respuesta_en || t.resuelto_en ? 'Resol.' : 'Resp.'}</span>
+                      <span className="mr-1 text-xs text-ink/40">{t.primera_respuesta_en || t.resuelto_en ? 'Resol.' : 'Resp.'}</span>
                       <TextoSla sla={sla} />
                     </td>
                   </tr>

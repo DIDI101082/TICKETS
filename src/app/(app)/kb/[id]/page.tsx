@@ -14,14 +14,14 @@ export default async function Ver({ params }: { params: Promise<{ id: string }> 
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <Link href="/kb" className="text-sm text-black/50 hover:text-tinta">
+      <Link href="/kb" className="text-sm text-ink/50 hover:text-ink">
         ← Volver
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-marca">{a.categoria}</p>
+          <p className="text-sm font-medium text-brand-600">{a.categoria}</p>
           <h1>{a.titulo}</h1>
-          <p className="mt-1 text-xs text-black/45">Actualizado {fecha(a.actualizado_en)}</p>
+          <p className="mt-1 text-xs text-ink/45">Actualizado {fecha(a.actualizado_en)}</p>
         </div>
         {staff && (
           <Link href={`/kb/editar/${a.id}`} className="btn-sec">
@@ -32,9 +32,9 @@ export default async function Ver({ params }: { params: Promise<{ id: string }> 
       <article className="tarjeta p-5">
         <Markdown texto={a.contenido} />
       </article>
-      <p className="text-sm text-black/60">
+      <p className="text-sm text-ink/60">
         ¿No te resolvió el problema?{' '}
-        <Link href="/portal/nuevo" className="text-marca underline">
+        <Link href="/portal/nuevo" className="text-brand-600 underline">
           Cargá un ticket
         </Link>
         .

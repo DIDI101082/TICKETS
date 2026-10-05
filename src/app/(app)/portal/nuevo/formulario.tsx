@@ -75,15 +75,15 @@ export default function Formulario() {
       </div>
 
       {sugerencias.length > 0 && (
-        <div className="rounded-md bg-marca-claro p-3">
-          <p className="text-sm font-medium text-marca-oscuro">Quizás esto te resuelve el problema ahora:</p>
+        <div className="rounded-md bg-brand-50 p-3">
+          <p className="text-sm font-medium text-brand-700">Quizás esto te resuelve el problema ahora:</p>
           <ul className="mt-1.5 space-y-1 text-sm">
             {sugerencias.map((s) => (
               <li key={s.id}>
-                <a href={`/kb/${s.id}`} target="_blank" rel="noopener" className="text-marca-oscuro underline">
+                <a href={`/kb/${s.id}`} target="_blank" rel="noopener" className="text-brand-700 underline">
                   {s.titulo}
                 </a>
-                <span className="text-black/45"> · {s.categoria}</span>
+                <span className="text-ink/45"> · {s.categoria}</span>
               </li>
             ))}
           </ul>
@@ -92,8 +92,8 @@ export default function Formulario() {
 
       <div>
         <label className="rotulo" htmlFor="archivos">Adjuntos (opcional)</label>
-        <input id="archivos" name="archivos" type="file" multiple className="block w-full text-sm text-black/70 file:mr-3 file:rounded-md file:border-0 file:bg-black/[0.06] file:px-3 file:py-1.5 file:text-sm file:font-medium" />
-        <p className="mt-1 text-xs text-black/45">Hasta 5 archivos, 4 MB en total.</p>
+        <input id="archivos" name="archivos" type="file" multiple className="block w-full text-sm text-ink/70 file:mr-3 file:rounded-md file:border-0 file:bg-line/[0.06] file:px-3 file:py-1.5 file:text-sm file:font-medium" />
+        <p className="mt-1 text-xs text-ink/45">Hasta 5 archivos, 4 MB en total.</p>
       </div>
 
       <Enviar />

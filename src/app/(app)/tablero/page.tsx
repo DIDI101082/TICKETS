@@ -6,9 +6,9 @@ import { ACTIVOS, type Sector, type Ticket } from '@/lib/tipos'
 function Cifra({ titulo, valor, nota, href, alerta }: { titulo: string; valor: string | number; nota?: string; href?: string; alerta?: boolean }) {
   const cuerpo = (
     <div className="tarjeta h-full p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-black/50">{titulo}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-ink/50">{titulo}</p>
       <p className={`mt-1 text-3xl font-semibold tabular-nums ${alerta ? 'text-red-700' : ''}`}>{valor}</p>
-      {nota && <p className="mt-0.5 text-xs text-black/50">{nota}</p>}
+      {nota && <p className="mt-0.5 text-xs text-ink/50">{nota}</p>}
     </div>
   )
   return href ? <Link href={href} className="block transition hover:opacity-80">{cuerpo}</Link> : cuerpo
@@ -16,14 +16,14 @@ function Cifra({ titulo, valor, nota, href, alerta }: { titulo: string; valor: s
 
 function Barras({ filas }: { filas: { etiqueta: string; valor: number }[] }) {
   const max = Math.max(1, ...filas.map((f) => f.valor))
-  if (!filas.length) return <p className="text-sm text-black/50">Sin datos.</p>
+  if (!filas.length) return <p className="text-sm text-ink/50">Sin datos.</p>
   return (
     <ul className="space-y-2">
       {filas.map((f) => (
         <li key={f.etiqueta} className="grid grid-cols-[9rem_1fr_2.5rem] items-center gap-2 text-sm">
-          <span className="truncate text-black/70">{f.etiqueta}</span>
-          <span className="h-2.5 rounded-full bg-black/[0.06]">
-            <span className="block h-2.5 rounded-full bg-marca" style={{ width: `${(f.valor / max) * 100}%` }} />
+          <span className="truncate text-ink/70">{f.etiqueta}</span>
+          <span className="h-2.5 rounded-full bg-line/[0.06]">
+            <span className="block h-2.5 rounded-full bg-brand-600" style={{ width: `${(f.valor / max) * 100}%` }} />
           </span>
           <span className="text-right font-medium tabular-nums">{f.valor}</span>
         </li>
@@ -96,7 +96,7 @@ export default async function Tablero() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1>Tablero</h1>
-          <p className="text-sm text-black/60">Situación actual y resultados de los últimos 30 días.</p>
+          <p className="text-sm text-ink/60">Situación actual y resultados de los últimos 30 días.</p>
         </div>
         <a href="/api/export" className="btn-sec">Exportar a Excel (CSV)</a>
       </div>
@@ -129,9 +129,9 @@ export default async function Tablero() {
         <section className="tarjeta overflow-x-auto p-4">
           <h2 className="mb-2">Por agente</h2>
           {porAgente.length === 0 ? (
-            <p className="text-sm text-black/50">Todavía no hay tickets asignados.</p>
+            <p className="text-sm text-ink/50">Todavía no hay tickets asignados.</p>
           ) : (
-            <table className="tabla">
+            <table className="tabla data">
               <thead>
                 <tr>
                   <th>Agente</th>

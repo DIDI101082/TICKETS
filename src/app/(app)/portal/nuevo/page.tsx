@@ -7,7 +7,7 @@ export default async function Nuevo() {
     <div className="mx-auto max-w-2xl space-y-5">
       <div>
         <h1>Nuevo ticket</h1>
-        <p className="text-sm text-black/60">
+        <p className="text-sm text-ink/60">
           Describí el problema con el mayor detalle posible. Lo derivamos automáticamente al sector que corresponde.
         </p>
       </div>

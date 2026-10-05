@@ -12,9 +12,9 @@ function Adjuntos({ lista }: { lista: Adjunto[] }) {
     <ul className="mt-2 flex flex-wrap gap-2">
       {lista.map((a) => (
         <li key={a.id}>
-          <a href={`/api/adjuntos/${a.id}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 rounded-md border border-black/10 bg-white px-2 py-1 text-xs hover:border-marca">
+          <a href={`/api/adjuntos/${a.id}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 rounded-md border border-line/10 bg-surface px-2 py-1 text-xs hover:border-brand-500">
             <span className="max-w-[14rem] truncate">{a.nombre}</span>
-            <span className="text-black/40">{tamano(a.tamano)}</span>
+            <span className="text-ink/40">{tamano(a.tamano)}</span>
           </a>
         </li>
       ))}
@@ -50,16 +50,16 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
   return (
     <div className="space-y-5">
       <div>
-        <Link href={staff ? '/agente' : '/portal'} className="text-sm text-black/50 hover:text-tinta">
+        <Link href={staff ? '/agente' : '/portal'} className="text-sm text-ink/50 hover:text-ink">
           ← Volver
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-sm text-black/45">#{t.numero}</span>
+          <span className="text-sm text-ink/45">#{t.numero}</span>
           <InsigniaEstado estado={t.estado} />
           {staff && <InsigniaPrioridad prioridad={t.prioridad} />}
         </div>
         <h1 className="mt-1">{t.asunto}</h1>
-        <p className="mt-1 text-sm text-black/55">
+        <p className="mt-1 text-sm text-ink/55">
           {t.solicitante_nombre || t.solicitante_email} · {fecha(t.creado_en)} · por {t.canal}
           {!staff && sector ? ` · lo atiende ${sector.nombre}` : ''}
         </p>
@@ -76,11 +76,11 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
             <article
               key={m.id}
               className={`rounded-lg border p-4 ${
-                m.interno ? 'border-amber-300 bg-amber-50' : m.de_staff ? 'border-marca/25 bg-marca-claro/60' : 'border-black/10 bg-white'
+                m.interno ? 'border-amber-300 bg-amber-50' : m.de_staff ? 'border-brand-500/25 bg-brand-50/60' : 'border-line/10 bg-surface'
               }`}
             >
-              <header className="mb-1.5 flex flex-wrap items-baseline gap-x-2 text-xs text-black/55">
-                <span className="text-sm font-medium text-tinta">{m.autor_nombre || 'Sin nombre'}</span>
+              <header className="mb-1.5 flex flex-wrap items-baseline gap-x-2 text-xs text-ink/55">
+                <span className="text-sm font-medium text-ink">{m.autor_nombre || 'Sin nombre'}</span>
                 {m.interno ? <span className="font-medium text-amber-800">Nota interna</span> : m.de_staff ? <span>Soporte</span> : null}
                 <span>{fecha(m.creado_en)}</span>
               </header>
@@ -93,13 +93,13 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
             <form action={responder.bind(null, t.id)} className="tarjeta space-y-3 p-4">
               <label className="rotulo" htmlFor="cuerpo">Responder</label>
               <textarea id="cuerpo" name="cuerpo" rows={5} className="campo" placeholder="Escribí tu respuesta…" />
-              <input name="archivos" type="file" multiple className="block w-full text-sm text-black/70 file:mr-3 file:rounded-md file:border-0 file:bg-black/[0.06] file:px-3 file:py-1.5 file:text-sm file:font-medium" />
+              <input name="archivos" type="file" multiple className="block w-full text-sm text-ink/70 file:mr-3 file:rounded-md file:border-0 file:bg-line/[0.06] file:px-3 file:py-1.5 file:text-sm file:font-medium" />
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <button className="btn">Enviar</button>
                 {staff && (
                   <>
                     <label className="flex items-center gap-1.5 text-sm">
-                      <input type="checkbox" name="interno" className="accent-marca" /> Nota interna (no la ve el solicitante)
+                      <input type="checkbox" name="interno" className="accent-brand-600" /> Nota interna (no la ve el solicitante)
                     </label>
                     <label className="flex items-center gap-1.5 text-sm">
                       Después de enviar:
@@ -114,14 +114,14 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
               </div>
             </form>
           ) : (
-            <p className="tarjeta p-4 text-sm text-black/60">
-              Este ticket está cerrado. Si el problema continúa, <Link href="/portal/nuevo" className="text-marca underline">cargá uno nuevo</Link>.
+            <p className="tarjeta p-4 text-sm text-ink/60">
+              Este ticket está cerrado. Si el problema continúa, <Link href="/portal/nuevo" className="text-brand-600 underline">cargá uno nuevo</Link>.
             </p>
           )}
 
           {!staff && esPropio && t.estado !== 'cerrado' && (
             <form action={cerrarPropio.bind(null, t.id)}>
-              <button className="text-sm text-black/55 underline-offset-2 hover:text-tinta hover:underline">
+              <button className="text-sm text-ink/55 underline-offset-2 hover:text-ink hover:underline">
                 Ya está resuelto, cerrar el ticket
               </button>
             </form>
@@ -177,14 +177,14 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
             <div className="tarjeta space-y-2 p-4 text-sm">
               <h2>SLA</h2>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-black/60">Primera respuesta</span>
+                <span className="text-ink/60">Primera respuesta</span>
                 <TextoSla sla={slaRespuesta(t)} />
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-black/60">Resolución</span>
+                <span className="text-ink/60">Resolución</span>
                 <TextoSla sla={slaResolucion(t)} />
               </div>
-              <p className="pt-1 text-xs text-black/45">
+              <p className="pt-1 text-xs text-ink/45">
                 Vence respuesta {fecha(t.vence_respuesta)} · resolución {fecha(t.vence_resolucion)}
               </p>
             </div>
@@ -198,9 +198,9 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
                   {!t.sector_id && ' (no alcanzó el umbral, quedó en triage)'}.
                 </p>
               ) : (
-                <p className="text-black/60">Sin sugerencia.</p>
+                <p className="text-ink/60">Sin sugerencia.</p>
               )}
-              {t.ia_motivo && <p className="text-black/60">{t.ia_motivo}</p>}
+              {t.ia_motivo && <p className="text-ink/60">{t.ia_motivo}</p>}
             </div>
 
             {eventos.length > 0 && (
@@ -208,9 +208,9 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
                 <h2 className="mb-2">Historial</h2>
                 <ul className="space-y-2">
                   {eventos.map((e) => (
-                    <li key={e.id} className="border-l-2 border-black/10 pl-2.5">
+                    <li key={e.id} className="border-l-2 border-line/10 pl-2.5">
                       <p>{e.detalle}</p>
-                      <p className="text-xs text-black/45">{e.autor_nombre} · {fecha(e.creado_en)}</p>
+                      <p className="text-xs text-ink/45">{e.autor_nombre} · {fecha(e.creado_en)}</p>
                     </li>
                   ))}
                 </ul>

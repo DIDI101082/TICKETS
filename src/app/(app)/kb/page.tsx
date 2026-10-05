@@ -22,7 +22,7 @@ export default async function Kb({ searchParams }: { searchParams: Promise<{ q?:
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1>{staff ? 'Base de conocimiento' : 'Ayuda'}</h1>
-          <p className="text-sm text-black/60">Guías y respuestas a los problemas más frecuentes.</p>
+          <p className="text-sm text-ink/60">Guías y respuestas a los problemas más frecuentes.</p>
         </div>
         {staff && (
           <Link href="/kb/editar/nuevo" className="btn-sec">
@@ -37,7 +37,7 @@ export default async function Kb({ searchParams }: { searchParams: Promise<{ q?:
       </form>
 
       {articulos.length === 0 ? (
-        <p className="tarjeta p-8 text-center text-sm text-black/60">
+        <p className="tarjeta p-8 text-center text-sm text-ink/60">
           {q ? 'No encontramos artículos con esa búsqueda.' : 'Todavía no hay artículos publicados.'}
         </p>
       ) : (
@@ -50,12 +50,12 @@ export default async function Kb({ searchParams }: { searchParams: Promise<{ q?:
                   .filter((a) => a.categoria === c)
                   .map((a) => (
                     <li key={a.id} className="flex items-baseline gap-2">
-                      <Link href={`/kb/${a.id}`} className="hover:text-marca hover:underline">
+                      <Link href={`/kb/${a.id}`} className="hover:text-brand-600 hover:underline">
                         {a.titulo}
                       </Link>
-                      {staff && !a.publicado && <span className="insignia bg-black/10 text-black/60">Borrador</span>}
+                      {staff && !a.publicado && <span className="pill bg-line/[0.05] text-ink/50">Borrador</span>}
                       {staff && a.publicado && a.visibilidad !== 'todos' && (
-                        <span className="insignia bg-amber-100 text-amber-900">{a.visibilidad === 'staff' ? 'Solo equipo' : 'Solo internos'}</span>
+                        <span className="pill bg-amber-500/10 text-amber-700">{a.visibilidad === 'staff' ? 'Solo equipo' : 'Solo internos'}</span>
                       )}
                     </li>
                   ))}

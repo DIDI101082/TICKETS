@@ -12,13 +12,13 @@ function enLinea(texto: string, clave: string): ReactNode[] {
     if (m[1]) partes.push(<strong key={`${clave}-${i}`}>{m[1]}</strong>)
     else if (m[2])
       partes.push(
-        <a key={`${clave}-${i}`} href={m[3]} target="_blank" rel="noopener noreferrer" className="text-marca underline">
+        <a key={`${clave}-${i}`} href={m[3]} target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">
           {m[2]}
         </a>,
       )
     else if (m[4])
       partes.push(
-        <code key={`${clave}-${i}`} className="rounded bg-black/[0.06] px-1 py-0.5 text-[0.9em]">
+        <code key={`${clave}-${i}`} className="rounded bg-line/[0.06] px-1 py-0.5 text-[0.9em]">
           {m[4]}
         </code>,
       )

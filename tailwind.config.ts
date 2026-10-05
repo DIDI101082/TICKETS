@@ -1,13 +1,30 @@
 import type { Config } from 'tailwindcss'
 
+// Misma paleta y tipografías que Accusys Cyber.
 export default {
   content: ['./src/**/*.{ts,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        tinta: '#16202e',
-        marca: { DEFAULT: '#0e6b64', oscuro: '#0a4f4a', claro: '#e3f1ef' },
-        papel: '#f6f5f1',
+        // Cambian con el modo claro / oscuro (ver globals.css)
+        ink: 'rgb(var(--c-ink) / <alpha-value>)',
+        line: 'rgb(var(--c-line) / <alpha-value>)',
+        surface: 'rgb(var(--c-surface) / <alpha-value>)',
+        canvas: 'rgb(var(--c-canvas) / <alpha-value>)',
+        brand: {
+          50: '#EBF1FE',
+          100: '#D2E0FD',
+          300: '#7EA1F8',
+          500: '#2F5CF0',
+          600: '#1E48DC',
+          700: '#1737AE',
+        },
+        amber: { 500: '#C4842B' },
+      },
+      fontFamily: {
+        sans: ['var(--font-body)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
       },
     },
   },
