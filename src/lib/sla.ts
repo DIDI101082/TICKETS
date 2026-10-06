@@ -5,6 +5,8 @@ import { crearTicket, registrarEvento } from './tickets'
 import { guardarConfig, leerConfig, leerOpciones } from './config'
 import { APP_URL, slaRespuesta, slaResolucion } from './formato'
 import { etiquetaPrioridad, type Ticket } from './tipos'
+import { indicadores } from './metricas'
+import { duracion } from './formato'
 
 // Minutos de anticipación con los que se avisa que un SLA está por vencer.
 const ANTICIPO = 30
@@ -30,7 +32,7 @@ export async function revisar() {
   const limite = new Date(ahora + ANTICIPO * 60000).toISOString()
   const { data: sectores } = await db.from('sectores').select('id,nombre,responsable_id')
   const sector = new Map((sectores ?? []).map((s) => [s.id as string, s]))
-  const resultado = { avisos: 0, escalados: 0, programados: 0 }
+  const resultado = { avisos: 0, escalados: 0, programados: 0, resumenes: 0 }
 
   // 1. Avisos de SLA por vencer o vencido
   const [resp, resol] = await Promise.all([
@@ -116,7 +118,54 @@ export async function revisar() {
     resultado.programados++
   }
 
+  // 4. Resumen mensual para el referente de cada organización (una vez por mes, sobre el mes anterior)
+  const mesActual = hoy.slice(0, 7)
+  const hecho = await leerConfig<{ mes: string }>('ultimo_resumen', { mes: '' })
+  if (hecho.mes !== mesActual) {
+    await guardarConfig('ultimo_resumen', { mes: mesActual })
+    // La primera vez solo se deja registrado el mes, para no mandar un resumen al instalar.
+    if (hecho.mes) resultado.resumenes = await enviarResumenes(mesActual)
+  }
+
   return resultado
+}
+
+async function enviarResumenes(mesActual: string) {
+  const db = admin()
+  const [a, m] = mesActual.split('-').map(Number)
+  const inicio = new Date(Date.UTC(a, m - 2, 1, 3)).toISOString()
+  const fin = new Date(Date.UTC(a, m - 1, 1, 3)).toISOString()
+  const nombreMes = new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(a, m - 2, 15)))
+
+  const { data: referentes } = await db.from('perfiles').select('email,nombre,organizacion_id').eq('ve_organizacion', true).not('organizacion_id', 'is', null)
+  const { data: orgs } = await db.from('organizaciones').select('id,nombre')
+  let enviados = 0
+  for (const org of orgs ?? []) {
+    const destinatarios = (referentes ?? []).filter((r) => r.organizacion_id === org.id)
+    if (!destinatarios.length) continue
+    // Los tickets confidenciales no entran en el resumen: el referente tampoco los ve en la app.
+    const { data } = await db.from('tickets').select('*').eq('organizacion_id', org.id).eq('confidencial', false).is('fusionado_en_id', null).gte('creado_en', inicio).lt('creado_en', fin)
+    const tickets = (data ?? []) as Ticket[]
+    if (!tickets.length) continue
+    const i = indicadores(org.nombre, tickets)
+    const texto = [
+      `Resumen de ${nombreMes} para ${org.nombre}:`,
+      '',
+      `Pedidos cargados: ${i.creados}`,
+      `Resueltos: ${i.resueltos}`,
+      `Todavía abiertos: ${tickets.filter((t) => !t.resuelto_en).length}`,
+      `Respondidos a tiempo: ${i.slaResp}`,
+      `Resueltos a tiempo: ${i.slaResol}`,
+      `Tiempo medio de resolución: ${i.tiempoResol == null ? 'sin datos' : duracion(i.tiempoResol)}`,
+      `Satisfacción: ${i.csat == null ? 'sin encuestas' : `${i.csat.toFixed(1)} de 5 (${i.encuestas} encuestas)`}`,
+      '',
+      `Podés ver el detalle en ${APP_URL}/portal?ver=org`,
+    ].join('\n')
+    for (const r of destinatarios) {
+      if (await enviarEmail(r.email, `Resumen de ${nombreMes}: ${org.nombre}`, `Hola ${r.nombre || ''},\n\n${texto}`)) enviados++
+    }
+  }
+  return enviados
 }
 
 /**

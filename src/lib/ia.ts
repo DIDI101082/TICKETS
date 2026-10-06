@@ -139,3 +139,19 @@ No agregues nada que no esté en el ticket.
 ${AVISO_DATOS}`
   return preguntar(sistema, hiloComoTexto(h), 400, process.env.AI_MODEL_REDACCION)
 }
+
+/** Respuesta de autoayuda para quien está por cargar un ticket, basada solo en los artículos de ayuda. */
+export async function asistir(consulta: string, articulos: { titulo: string; contenido: string }[]) {
+  if (!articulos.length) return null
+  const sistema = `Ayudás a una persona que está por cargar un pedido en la mesa de ayuda. Tenés artículos de la base de conocimiento.
+
+- Si alguno de los artículos resuelve o encamina lo que plantea, explicale los pasos en español rioplatense, con trato de "vos", en no más de ocho líneas, y nombrá el artículo del que salen.
+- Usá únicamente lo que dicen los artículos. No inventes pasos, sistemas, direcciones ni plazos.
+- Si ningún artículo aplica, respondé exactamente: SIN_RESPUESTA
+- Texto plano, sin markdown.
+
+${AVISO_DATOS}`
+  const usuario = `<consulta>\n${consulta.slice(0, 3000)}\n</consulta>\n\n<articulos>\n${articulos.map((a) => `## ${a.titulo}\n${a.contenido.slice(0, 2500)}`).join('\n\n')}\n</articulos>`
+  const texto = await preguntar(sistema, usuario, 600, process.env.AI_MODEL_REDACCION)
+  return texto && !texto.includes('SIN_RESPUESTA') ? texto : null
+}

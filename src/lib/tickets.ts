@@ -2,10 +2,11 @@ import 'server-only'
 import { admin } from './supabase/admin'
 import { clasificar } from './ia'
 import { avisarTeams, enviarEmail } from './avisos'
+import { avisarInteresados, avisarPersona } from './notificar'
 import { leerOpciones } from './config'
 import { claves, coincidencias } from './texto'
 import { APP_URL } from './formato'
-import { etiquetaPrioridad, type Canal, type Categoria, type Dato, type Prioridad, type Ticket } from './tipos'
+import { etiquetaPrioridad, prioridadPorImpacto, type Canal, type Categoria, type Dato, type Prioridad, type Ticket } from './tipos'
 
 export const MAX_ADJUNTO = 4 * 1024 * 1024
 
@@ -57,6 +58,11 @@ export async function crearTicket(e: {
   sinIA?: boolean
   claveExterna?: string | null
   avisarSolicitante?: boolean
+  impacto?: string
+  urgencia?: string
+  beneficiarioId?: string | null
+  beneficiarioNombre?: string
+  seguidores?: string[]
 }): Promise<Ticket> {
   const db = admin()
   const email = e.email.toLowerCase()
@@ -78,7 +84,8 @@ export async function crearTicket(e: {
   }
 
   let sectorId = e.sectorId ?? categoria?.sector_id ?? null
-  let prioridad = e.prioridad ?? categoria?.prioridad ?? null
+  // La prioridad sale, en orden: del origen, de la categoría, de lo que declaró la persona, y si no de la IA.
+  let prioridad = e.prioridad ?? categoria?.prioridad ?? prioridadPorImpacto(e.impacto, e.urgencia)
   const datos = e.datos ?? []
   let ia = { sugerido: null as string | null, confianza: null as number | null, motivo: '' }
   let origen = sectorId ? (e.sectorId ? 'Sector definido por el origen' : `Sector definido por la categoría ${categoria?.nombre}`) : ''
@@ -112,6 +119,10 @@ export async function crearTicket(e: {
       confidencial: categoria?.confidencial ?? false,
       aprobacion_estado: categoria?.requiere_aprobacion ? 'pendiente' : 'no_requiere',
       clave_externa: e.claveExterna ?? null,
+      impacto: e.impacto ?? '',
+      urgencia: e.urgencia ?? '',
+      beneficiario_id: e.beneficiarioId ?? null,
+      beneficiario_nombre: e.beneficiarioNombre ?? '',
       ia_sector: ia.sugerido,
       ia_confianza: ia.confianza,
       ia_motivo: ia.motivo || null,
@@ -130,7 +141,19 @@ export async function crearTicket(e: {
   if (t.aprobacion_estado === 'pendiente') await registrarEvento(t.id, 'Sistema', 'Requiere aprobación: falta designar quién aprueba')
 
   const url = `${APP_URL}/tickets/${t.id}`
+  const copia = [...new Set(e.seguidores ?? [])].filter((id) => id !== t.solicitante_id && id !== t.beneficiario_id)
+  if (copia.length) await db.from('ticket_seguidores').insert(copia.map((perfil_id) => ({ ticket_id: t.id, perfil_id })))
+  const quien = t.solicitante_nombre || t.solicitante_email
   await Promise.all([
+    ...[...(t.beneficiario_id ? [t.beneficiario_id] : []), ...copia].map((perfilId) =>
+      avisarPersona({
+        perfilId,
+        ticket: t,
+        tipo: 'otro',
+        titulo: perfilId === t.beneficiario_id ? 'Cargaron un pedido para vos' : 'Te pusieron en copia',
+        texto: `${quien} cargó el pedido #${t.numero}: ${t.asunto}`,
+      }),
+    ),
     detectarIncidente(t, sector ?? null),
     avisarTeams(
       `Nuevo ticket #${t.numero}: ${t.confidencial ? '(confidencial)' : t.asunto}`,
@@ -193,12 +216,12 @@ export function limpiarRespuesta(texto: string) {
   return util.join('\n').trim()
 }
 
-/** Aviso al solicitante cuando su ticket queda resuelto, con el enlace a la encuesta. */
+/** Aviso a los interesados cuando el ticket queda resuelto, con el enlace a la encuesta. */
 export async function avisarResuelto(t: Ticket) {
-  if (!t.solicitante_email.includes('@') || t.canal === 'monitoreo' || t.canal === 'programado') return
-  await enviarEmail(
-    t.solicitante_email,
-    `[#${t.numero}] Tu pedido fue resuelto: ${t.asunto}`,
-    `Hola ${t.solicitante_nombre || ''},\n\nMarcamos tu pedido #${t.numero} como resuelto.\n\n¿Cómo te atendimos? Contanos en ${APP_URL}/tickets/${t.id}#encuesta (te lleva diez segundos).\n\nSi el problema sigue, respondé este mail y lo reabrimos.`,
-  )
+  if (t.canal === 'monitoreo' || t.canal === 'programado') return
+  await avisarInteresados(t, {
+    tipo: 'resuelto',
+    titulo: 'Tu pedido fue resuelto',
+    texto: `Marcamos el pedido #${t.numero} como resuelto.\n\n¿Cómo te atendimos? Contanos en ${APP_URL}/tickets/${t.id}#encuesta (te lleva diez segundos).\n\nSi el problema sigue, podés reabrirlo desde el mismo enlace.`,
+  })
 }

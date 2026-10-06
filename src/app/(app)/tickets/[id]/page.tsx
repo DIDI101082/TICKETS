@@ -1,14 +1,16 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sesion } from '@/lib/auth'
+import { admin } from '@/lib/supabase/admin'
 import { auditar } from '@/lib/auditoria'
 import { iaDisponible } from '@/lib/ia'
 import { claves, coincidencias, rellenar } from '@/lib/texto'
 import { fecha, slaRespuesta, slaResolucion, tamano } from '@/lib/formato'
 import { InsigniaEstado, InsigniaPrioridad, TextoSla } from '@/components/Insignias'
-import { ESTADOS, PRIORIDADES, type Adjunto, type Mensaje, type Sector, type Ticket } from '@/lib/tipos'
+import { ESTADOS, PRIORIDADES, etiquetaImpacto, etiquetaUrgencia, type Adjunto, type Mensaje, type Sector, type Ticket } from '@/lib/tipos'
+import Pasos from '@/components/Pasos'
 import Respuesta from './Respuesta'
-import { actualizar, calificar, cerrarPropio, decidirAprobacion, desvincular, fusionar, generarResumen, pedirAprobacion, tomar, vincular } from './acciones'
+import { agregarSeguidor, quitarSeguidor, reabrir, actualizar, calificar, cerrarPropio, decidirAprobacion, desvincular, fusionar, generarResumen, pedirAprobacion, tomar, vincular } from './acciones'
 
 function Adjuntos({ lista }: { lista: Adjunto[] }) {
   if (!lista.length) return null
@@ -56,6 +58,8 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
   const { data } = await db.from('tickets').select('*').eq('id', id).maybeSingle()
   if (!data) notFound()
   const t = data as Ticket
+  // Al abrir el ticket se dan por leídas sus notificaciones.
+  await admin().from('notificaciones').update({ leida: true }).eq('perfil_id', perfil.id).eq('ticket_id', id).eq('leida', false)
   if (staff) await auditar(perfil, 'Vio ticket', 'ticket', `#${t.numero}`, t.confidencial ? 'Confidencial' : '')
 
   const nada = Promise.resolve({ data: [] as never[] })
@@ -94,11 +98,18 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
     t.fusionado_en_id ? db.from('tickets').select('id,numero,asunto,estado').eq('id', t.fusionado_en_id).maybeSingle() : Promise.resolve({ data: null }),
     t.aprobador_id && staff ? db.from('perfiles').select('nombre,email').eq('id', t.aprobador_id).maybeSingle() : Promise.resolve({ data: null }),
   ])
+  // Personas en copia: los nombres se leen del lado del servidor porque un usuario no puede ver perfiles ajenos.
+  const { data: seg } = await db.from('ticket_seguidores').select('perfil_id').eq('ticket_id', id)
+  const idsCopia = (seg ?? []).map((x) => x.perfil_id as string)
+  const { data: enCopia } = idsCopia.length ? await admin().from('perfiles').select('id,nombre,email').in('id', idsCopia) : { data: [] }
+  const seguidores = (enCopia ?? []) as { id: string; nombre: string; email: string }[]
   const padre = rpadre.data as Mini | null
   const fusion = rfus.data as Mini | null
 
   const sector = sectores.find((s) => s.id === t.sector_id)
-  const esPropio = t.solicitante_id === perfil.id
+  const esPropio = t.solicitante_id === perfil.id || t.beneficiario_id === perfil.id
+  const ultimo = mensajes.filter((m) => !m.interno).at(-1)
+  const esperaAlUsuario = t.estado === 'en_espera' && t.aprobacion_estado !== 'pendiente' && !!ultimo?.de_staff
   const esAprobador = t.aprobador_id === perfil.id
   const puedeResponder = !t.fusionado_en_id && (staff || t.estado !== 'cerrado')
   const terminado = t.estado === 'resuelto' || t.estado === 'cerrado'
@@ -131,7 +142,37 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
           {rcat.data ? ` · ${rcat.data.nombre}` : ''}
           {!staff && sector ? ` · lo atiende ${sector.nombre}` : ''}
         </p>
+        {(t.beneficiario_nombre || (staff && (t.impacto || t.urgencia))) && (
+          <p className="mt-0.5 text-sm text-ink/55">
+            {t.beneficiario_nombre && <>Pedido para <span className="text-ink/80">{t.beneficiario_nombre}</span></>}
+            {staff && t.impacto && <>{t.beneficiario_nombre ? ' · ' : ''}Afecta: {etiquetaImpacto(t.impacto).toLowerCase()}</>}
+            {staff && t.urgencia && <> · {etiquetaUrgencia(t.urgencia)}</>}
+          </p>
+        )}
       </div>
+
+      {!staff && !fusion && (
+        <div className="tarjeta space-y-3 p-4">
+          <Pasos t={t} />
+          {esperaAlUsuario && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+              Estamos esperando tu respuesta para seguir. Leé el último mensaje y contestá más abajo.
+            </p>
+          )}
+          {t.aprobacion_estado === 'pendiente' && !esAprobador && (
+            <p className="text-sm text-ink/65">El pedido está esperando la aprobación de un responsable. Te avisamos apenas decida.</p>
+          )}
+          {!terminado && !esperaAlUsuario && t.aprobacion_estado !== 'pendiente' && (
+            <p className="text-sm text-ink/65">
+              {!t.primera_respuesta_en && t.vence_respuesta
+                ? <>Te respondemos antes del <strong className="text-ink">{fecha(t.vence_respuesta)}</strong>.</>
+                : t.vence_resolucion && t.estado !== 'en_espera'
+                  ? <>Estimamos resolverlo antes del <strong className="text-ink">{fecha(t.vence_resolucion)}</strong>.</>
+                  : null}
+            </p>
+          )}
+        </div>
+      )}
 
       {fusion && (
         <p className="tarjeta p-4 text-sm">
@@ -223,10 +264,46 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
             </div>
           )}
 
-          {!staff && esPropio && t.estado !== 'cerrado' && (
-            <form action={cerrarPropio.bind(null, t.id)}>
-              <button className="text-sm text-ink/55 underline-offset-2 hover:text-ink hover:underline">Ya está resuelto, cerrar el ticket</button>
-            </form>
+          {!staff && esPropio && !fusion && (
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+              {terminado ? (
+                <form action={reabrir.bind(null, t.id)}>
+                  <button className="btn-sec">El problema sigue: reabrir</button>
+                </form>
+              ) : (
+                <form action={cerrarPropio.bind(null, t.id)}>
+                  <button className="text-ink/55 underline-offset-2 hover:text-ink hover:underline">Ya está resuelto, cerrar el ticket</button>
+                </form>
+              )}
+              <Link href={`/portal/nuevo?desde=${t.id}`} className="text-ink/55 underline-offset-2 hover:text-ink hover:underline">
+                Cargar otro pedido igual
+              </Link>
+            </div>
+          )}
+
+          {!staff && (seguidores.length > 0 || (esPropio && !fusion)) && (
+            <div className="tarjeta space-y-2 p-4 text-sm">
+              <h2>Personas en copia</h2>
+              {seguidores.length === 0 && <p className="text-ink/60">Podés sumar a un compañero para que siga el pedido y pueda comentar.</p>}
+              <ul className="space-y-1">
+                {seguidores.map((sg) => (
+                  <li key={sg.id} className="flex items-center justify-between gap-2">
+                    <span>{sg.nombre || sg.email}</span>
+                    {(t.solicitante_id === perfil.id || sg.id === perfil.id) && (
+                      <form action={quitarSeguidor.bind(null, t.id, sg.id)}>
+                        <button className="text-xs text-ink/50 hover:text-red-700">{sg.id === perfil.id ? 'Dejar de seguir' : 'Quitar'}</button>
+                      </form>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {esPropio && !fusion && (
+                <form action={agregarSeguidor.bind(null, t.id)} className="flex gap-2 pt-1">
+                  <input name="email" type="email" required placeholder="Mail de la persona" className="campo" />
+                  <button className="btn-sec shrink-0 px-3">Agregar</button>
+                </form>
+              )}
+            </div>
           )}
 
           {!staff && (padre || hijos.length > 0) && (
@@ -345,6 +422,28 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
                   <button className="btn-sec shrink-0 px-3">Pedir</button>
                 </form>
               )}
+            </div>
+
+            <div className="tarjeta space-y-2 p-4 text-sm">
+              <h2>Personas en copia</h2>
+              {seguidores.length === 0 ? (
+                <p className="text-ink/60">Nadie en copia.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {seguidores.map((sg) => (
+                    <li key={sg.id} className="flex items-center justify-between gap-2">
+                      <span className="truncate">{sg.nombre || sg.email}</span>
+                      <form action={quitarSeguidor.bind(null, t.id, sg.id)}>
+                        <button className="text-xs text-ink/50 hover:text-red-700">Quitar</button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <form action={agregarSeguidor.bind(null, t.id)} className="flex gap-2 pt-1">
+                <input name="email" type="email" required placeholder="Mail de la persona" className="campo" />
+                <button className="btn-sec shrink-0 px-3">Agregar</button>
+              </form>
             </div>
 
             <div className="tarjeta space-y-2 p-4 text-sm">

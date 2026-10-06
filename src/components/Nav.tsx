@@ -5,6 +5,15 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Mark from './Mark'
 import { alternarTema, estaOscuro } from '@/lib/tema'
+import { marcarLeidas } from '@/app/(app)/acciones'
+
+export interface Aviso {
+  id: string
+  ticket_id: string | null
+  texto: string
+  leida: boolean
+  creado_en: string
+}
 
 const ROL: Record<string, string> = { admin: 'Administrador', agente: 'Agente', usuario: 'Usuario' }
 
@@ -27,7 +36,7 @@ function iniciales(nombre: string) {
 
 const dentro = (pathname: string, ruta: string) => pathname === ruta || pathname.startsWith(ruta + '/')
 
-export default function Nav({ nombre, email, rol }: { nombre: string; email: string; rol: string }) {
+export default function Nav({ nombre, email, rol, avisos, sinLeer }: { nombre: string; email: string; rol: string; avisos: Aviso[]; sinLeer: number }) {
   const pathname = usePathname()
   const staff = rol !== 'usuario'
 
@@ -45,10 +54,11 @@ export default function Nav({ nombre, email, rol }: { nombre: string; email: str
         {
           href: '/kb',
           label: 'Conocimiento',
-          tambien: ['/plantillas'],
+          tambien: ['/plantillas', '/estado'],
           paginas: [
             { href: '/kb', label: 'Artículos' },
             { href: '/plantillas', label: 'Respuestas predefinidas' },
+            { href: '/estado', label: 'Estado de servicios' },
           ],
         },
         ...(rol === 'admin'
@@ -69,8 +79,9 @@ export default function Nav({ nombre, email, rol }: { nombre: string; email: str
           : []),
       ]
     : [
-        { href: '/portal', label: 'Mis tickets', tambien: ['/tickets'] },
+        { href: '/portal', label: 'Inicio', tambien: ['/tickets'] },
         { href: '/kb', label: 'Ayuda' },
+        { href: '/estado', label: 'Estado de servicios' },
       ]
 
   const activa = solapas.find((s) => [s.href, ...(s.tambien ?? [])].some((r) => dentro(pathname, r)))
@@ -110,6 +121,7 @@ export default function Nav({ nombre, email, rol }: { nombre: string; email: str
           <Link href="/portal/nuevo" className="btn px-3 py-1.5">
             Nuevo ticket
           </Link>
+          <Campana avisos={avisos} sinLeer={sinLeer} />
           <MenuUsuario nombre={nombre || email} email={email} rol={rol} />
         </div>
       </div>
@@ -185,6 +197,9 @@ function MenuUsuario({ nombre, email, rol }: { nombre: string; email: string; ro
               Mis pedidos y aprobaciones
             </Link>
           )}
+          <Link href="/cuenta" onClick={() => setAbierto(false)} className="mt-1 block rounded-md px-2.5 py-1.5 text-sm text-ink/70 hover:bg-line/[0.04] hover:text-ink">
+            Mi cuenta y avisos
+          </Link>
           <button
             type="button"
             onClick={() => setOscuro(alternarTema())}
@@ -195,6 +210,87 @@ function MenuUsuario({ nombre, email, rol }: { nombre: string; email: string; ro
           <form action="/auth/salir" method="post">
             <button className="block w-full rounded-md px-2.5 py-1.5 text-left text-sm text-ink/70 hover:bg-line/[0.04] hover:text-ink">Cerrar sesión</button>
           </form>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function hace(d: string) {
+  const min = Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 60000))
+  if (min < 1) return 'recién'
+  if (min < 60) return `hace ${min} min`
+  if (min < 1440) return `hace ${Math.floor(min / 60)} h`
+  return `hace ${Math.floor(min / 1440)} d`
+}
+
+function Campana({ avisos, sinLeer }: { avisos: Aviso[]; sinLeer: number }) {
+  const [abierto, setAbierto] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!abierto) return
+    const fuera = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false)
+    }
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAbierto(false)
+    }
+    document.addEventListener('mousedown', fuera)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', fuera)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [abierto])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setAbierto(!abierto)}
+        aria-expanded={abierto}
+        aria-label={sinLeer ? `Notificaciones: ${sinLeer} sin leer` : 'Notificaciones'}
+        className="relative grid h-8 w-8 place-items-center rounded-full text-ink/60 transition-colors hover:bg-line/[0.05] hover:text-ink"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+        </svg>
+        {sinLeer > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white">
+            {sinLeer > 9 ? '9+' : sinLeer}
+          </span>
+        )}
+      </button>
+      {abierto && (
+        <div className="tarjeta absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] p-1.5 shadow-lg">
+          <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+            <p className="text-sm font-medium">Novedades</p>
+            {sinLeer > 0 && (
+              <form action={marcarLeidas}>
+                <button className="text-xs text-brand-600 hover:underline">Marcar todas como leídas</button>
+              </form>
+            )}
+          </div>
+          {avisos.length === 0 ? (
+            <p className="px-2.5 py-4 text-center text-sm text-ink/55">No hay novedades.</p>
+          ) : (
+            <ul className="max-h-96 overflow-y-auto">
+              {avisos.map((a) => (
+                <li key={a.id}>
+                  <Link
+                    href={a.ticket_id ? `/tickets/${a.ticket_id}` : '/portal'}
+                    onClick={() => setAbierto(false)}
+                    className={`block rounded-md px-2.5 py-2 text-sm hover:bg-line/[0.04] ${a.leida ? 'text-ink/60' : 'font-medium text-ink'}`}
+                  >
+                    {a.texto}
+                    <span className="block text-xs font-normal text-ink/45">{hace(a.creado_en)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

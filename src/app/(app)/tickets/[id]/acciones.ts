@@ -5,11 +5,11 @@ import { revalidatePath } from 'next/cache'
 import { sesion } from '@/lib/auth'
 import { admin } from '@/lib/supabase/admin'
 import { archivosDe, avisarResuelto, registrarEvento, subirAdjuntos } from '@/lib/tickets'
-import { enviarEmail } from '@/lib/avisos'
+import { avisarInteresados, avisarPersona } from '@/lib/notificar'
+import { registrarDecision, solicitarAprobacion } from '@/lib/aprobaciones'
 import { auditar } from '@/lib/auditoria'
 import { redactarBorrador, resumir, type Hilo } from '@/lib/ia'
 import { claves, coincidencias } from '@/lib/texto'
-import { APP_URL } from '@/lib/formato'
 import { ESTADOS, PRIORIDADES, etiquetaEstado, etiquetaPrioridad, type Mensaje, type Ticket } from '@/lib/tipos'
 
 // Toda acción empieza leyendo el ticket con la sesión del usuario: si no tiene permiso, no lo ve.
@@ -69,14 +69,19 @@ export async function responder(ticketId: string, form: FormData) {
       if (cambios.asignado_id) await registrarEvento(ticketId, perfil.nombre, 'Tomó el ticket')
     }
 
-    if (t.solicitante_email.includes('@')) {
-      await enviarEmail(
-        t.solicitante_email,
-        `[#${t.numero}] Nueva respuesta: ${t.asunto}`,
-        `${perfil.nombre} respondió tu pedido:\n\n${cuerpo}\n\nPodés verlo y contestar en ${APP_URL}/tickets/${t.id} o respondiendo este mail sin cambiar el asunto.`,
-      )
-    }
+    await avisarInteresados(
+      t,
+      {
+        tipo: 'respuesta',
+        titulo: pedido === 'en_espera' ? 'Necesitamos tu respuesta' : 'Nueva respuesta',
+        texto: `${perfil.nombre} respondió el pedido:\n\n${cuerpo}\n\nPodés contestar desde la app o respondiendo este mail sin cambiar el asunto.`,
+      },
+      perfil.id,
+    )
     if (cambios.estado === 'resuelto') await avisarResuelto(t)
+  } else if (!staff && t.asignado_id) {
+    // Respondió el solicitante (o alguien en copia): se le avisa a quien atiende el ticket.
+    await avisarPersona({ perfilId: t.asignado_id, ticket: t, tipo: 'respuesta', titulo: 'Respondió el solicitante', texto: `${perfil.nombre || perfil.email} respondió:\n\n${cuerpo}` })
   }
   volver(ticketId)
 }
@@ -189,37 +194,61 @@ export async function calificar(ticketId: string, form: FormData) {
 export async function pedirAprobacion(ticketId: string, form: FormData) {
   const { perfil, t } = await ticketStaff(ticketId)
   const email = String(form.get('email') || '').trim().toLowerCase()
-  const db = admin()
-  const { data: aprobador } = await db.from('perfiles').select('id,nombre,email').ilike('email', email).maybeSingle()
+  const { data: aprobador } = await admin().from('perfiles').select('id,nombre,email').ilike('email', email).maybeSingle()
   if (!aprobador) {
     await registrarEvento(ticketId, perfil.nombre, `No se pudo pedir aprobación: ${email || 'sin email'} no tiene cuenta en la mesa de ayuda`)
     volver(ticketId)
   }
-  await db
-    .from('tickets')
-    .update({ aprobacion_estado: 'pendiente', aprobador_id: aprobador.id, aprobacion_nota: '', aprobacion_en: null, ...(t.estado !== 'en_espera' ? { estado: 'en_espera' } : {}) })
-    .eq('id', ticketId)
-  await registrarEvento(ticketId, perfil.nombre, `Pidió aprobación a ${aprobador.nombre || aprobador.email}`)
-  await enviarEmail(
-    aprobador.email,
-    `[#${t.numero}] Necesitamos tu aprobación: ${t.asunto}`,
-    `Hola ${aprobador.nombre || ''},\n\n${t.solicitante_nombre || t.solicitante_email} hizo un pedido que necesita tu aprobación.\n\nPodés verlo y aprobarlo o rechazarlo en ${APP_URL}/tickets/${t.id}`,
-  )
+  await solicitarAprobacion(t, aprobador, perfil.nombre)
   volver(ticketId)
 }
 
 export async function decidirAprobacion(ticketId: string, form: FormData) {
   const { perfil, t } = await ticketVisible(ticketId)
   const decision = String(form.get('decision') || '')
-  if (t.aprobador_id === perfil.id && t.aprobacion_estado === 'pendiente' && (decision === 'aprobado' || decision === 'rechazado')) {
-    const nota = String(form.get('nota') || '').trim().slice(0, 1000)
-    await admin()
-      .from('tickets')
-      .update({ aprobacion_estado: decision, aprobacion_nota: nota, aprobacion_en: new Date().toISOString(), ...(t.estado === 'en_espera' ? { estado: 'en_curso' } : {}) })
-      .eq('id', ticketId)
-    await registrarEvento(ticketId, perfil.nombre, `${decision === 'aprobado' ? 'Aprobó' : 'Rechazó'} el pedido${nota ? `: ${nota}` : ''}`)
-    await auditar(perfil, decision === 'aprobado' ? 'Aprobó pedido' : 'Rechazó pedido', 'ticket', `#${t.numero}`, nota)
+  if (t.aprobador_id === perfil.id && (decision === 'aprobado' || decision === 'rechazado')) {
+    await registrarDecision(t, decision, String(form.get('nota') || '').trim(), perfil)
   }
+  volver(ticketId)
+}
+
+// ---------- Reabrir y personas en copia ----------
+
+export async function reabrir(ticketId: string) {
+  const { perfil, t } = await ticketVisible(ticketId)
+  const propio = t.solicitante_id === perfil.id || t.beneficiario_id === perfil.id
+  if (propio && ['resuelto', 'cerrado'].includes(t.estado) && !t.fusionado_en_id) {
+    await admin().from('tickets').update({ estado: 'en_curso' }).eq('id', ticketId)
+    await registrarEvento(ticketId, perfil.nombre, 'El solicitante reabrió el ticket')
+    if (t.asignado_id) await avisarPersona({ perfilId: t.asignado_id, ticket: t, tipo: 'otro', titulo: 'Ticket reabierto', texto: `${perfil.nombre || perfil.email} reabrió el pedido #${t.numero}.` })
+  }
+  volver(ticketId)
+}
+
+export async function agregarSeguidor(ticketId: string, form: FormData) {
+  const { perfil, staff, t } = await ticketVisible(ticketId)
+  const email = String(form.get('email') || '').trim().toLowerCase()
+  // Solo suman gente quienes atienden el ticket o quien lo pidió, y nunca a un ticket confidencial desde afuera.
+  const puede = staff || t.solicitante_id === perfil.id || t.beneficiario_id === perfil.id
+  if (puede && email) {
+    const db = admin()
+    const { data: p } = await db.from('perfiles').select('id,nombre,email').ilike('email', email).maybeSingle()
+    if (p && p.id !== t.solicitante_id) {
+      await db.from('ticket_seguidores').upsert({ ticket_id: ticketId, perfil_id: p.id })
+      await registrarEvento(ticketId, perfil.nombre, `Agregó en copia a ${p.nombre || p.email}`)
+      await avisarPersona({ perfilId: p.id, ticket: t, tipo: 'otro', titulo: 'Te pusieron en copia', texto: `${perfil.nombre || perfil.email} te agregó al pedido #${t.numero}: ${t.asunto}` })
+    }
+  }
+  volver(ticketId)
+}
+
+export async function quitarSeguidor(ticketId: string, perfilId: string) {
+  const { perfil, staff, t } = await ticketVisible(ticketId)
+  if (staff || t.solicitante_id === perfil.id || perfilId === perfil.id) {
+    await admin().from('ticket_seguidores').delete().eq('ticket_id', ticketId).eq('perfil_id', perfilId)
+    await registrarEvento(ticketId, perfil.nombre, 'Quitó a una persona en copia')
+  }
+  if (perfilId === perfil.id && !staff) redirect('/portal')
   volver(ticketId)
 }
 

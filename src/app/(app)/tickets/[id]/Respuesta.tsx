@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { useFormStatus } from 'react-dom'
+import { pegarImagenes } from '@/components/pegar'
 import { borradorIA, responder } from './acciones'
 
 function Enviar() {
@@ -27,6 +28,8 @@ export default function Respuesta({
   const [texto, setTexto] = useState('')
   const [aviso, setAviso] = useState('')
   const [pensando, iniciar] = useTransition()
+  const archivos = useRef<HTMLInputElement>(null)
+  const [pegados, setPegados] = useState(0)
 
   function pedirBorrador() {
     setAviso('')
@@ -69,9 +72,17 @@ export default function Respuesta({
           </div>
         )}
       </div>
-      <textarea id="cuerpo" name="cuerpo" rows={6} className="campo" placeholder="Escribí tu respuesta…" value={texto} onChange={(e) => setTexto(e.target.value)} />
+      <textarea id="cuerpo" name="cuerpo" rows={6} className="campo" placeholder="Escribí tu respuesta… Podés pegar capturas de pantalla con Ctrl+V."
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        onPaste={(e) => {
+          const n = pegarImagenes(e, archivos.current)
+          if (n) setPegados(n)
+        }}
+      />
+      {pegados > 0 && <p className="text-xs text-ink/55" role="status">Captura agregada a los adjuntos ({pegados} en total).</p>}
       {aviso && <p className="text-xs text-ink/55" role="status">{aviso}</p>}
-      <input name="archivos" type="file" multiple className="block w-full text-sm text-ink/70 file:mr-3 file:rounded-md file:border-0 file:bg-line/[0.06] file:px-3 file:py-1.5 file:text-sm file:font-medium" />
+      <input ref={archivos} name="archivos" type="file" multiple className="block w-full text-sm text-ink/70 file:mr-3 file:rounded-md file:border-0 file:bg-line/[0.06] file:px-3 file:py-1.5 file:text-sm file:font-medium" />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Enviar />
         {staff && (

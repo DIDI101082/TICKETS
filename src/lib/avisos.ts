@@ -60,3 +60,25 @@ export async function enviarEmail(para: string, asunto: string, texto: string): 
     return false
   }
 }
+
+/**
+ * Mensaje directo por Teams a una persona. Requiere un flujo de Power Automate
+ * ("Cuando se recibe una solicitud HTTP" -> "Publicar mensaje en un chat", destinatario = email)
+ * cuya dirección va en TEAMS_USUARIO_WEBHOOK_URL. Sin esa variable no hace nada.
+ */
+export async function avisarTeamsPersona(email: string, titulo: string, texto: string, url: string): Promise<boolean> {
+  const destino = process.env.TEAMS_USUARIO_WEBHOOK_URL
+  if (!destino || !email.includes('@')) return false
+  try {
+    const r = await fetch(destino, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, titulo, texto: texto.slice(0, 1500), url }),
+      signal: AbortSignal.timeout(10000),
+    })
+    return r.ok
+  } catch (e) {
+    console.error('Aviso por Teams a la persona falló:', e)
+    return false
+  }
+}

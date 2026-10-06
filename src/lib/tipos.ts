@@ -33,6 +33,7 @@ export interface Perfil {
   organizacion: string
   organizacion_id: string | null
   ve_organizacion: boolean
+  avisos_mail: 'todo' | 'resuelto' | 'nada'
 }
 
 export interface Sector {
@@ -118,6 +119,10 @@ export interface Ticket {
   escalado_en: string | null
   incidente: boolean
   clave_externa: string | null
+  impacto: string
+  urgencia: string
+  beneficiario_id: string | null
+  beneficiario_nombre: string
 }
 
 export interface Mensaje {
@@ -166,3 +171,34 @@ export interface Opciones {
 
 export const HORARIO_INICIAL: Horario = { activo: false, dias: [1, 2, 3, 4, 5], desde: '09:00', hasta: '18:00', zona: 'America/Argentina/Buenos_Aires' }
 export const OPCIONES_INICIALES: Opciones = { restringir_sector: false, escalar_sin_tomar_min: 120, incidente_cantidad: 4, incidente_minutos: 30 }
+
+// Impacto y urgencia que declara quien carga el pedido. Con los dos se propone una prioridad.
+export const IMPACTOS = [
+  { valor: 'yo', etiqueta: 'Solo a mí' },
+  { valor: 'equipo', etiqueta: 'A mi equipo' },
+  { valor: 'empresa', etiqueta: 'A toda el área o la empresa' },
+]
+export const URGENCIAS = [
+  { valor: 'puede_esperar', etiqueta: 'Puede esperar', ayuda: 'Es una consulta o un pedido sin fecha.' },
+  { valor: 'complica', etiqueta: 'Me complica el trabajo', ayuda: 'Puedo seguir, pero con dificultad o con una alternativa.' },
+  { valor: 'bloqueado', etiqueta: 'No puedo trabajar', ayuda: 'Estoy frenado hasta que se resuelva.' },
+]
+
+export function prioridadPorImpacto(impacto?: string | null, urgencia?: string | null): Prioridad | null {
+  const i = IMPACTOS.findIndex((x) => x.valor === impacto)
+  const u = URGENCIAS.findIndex((x) => x.valor === urgencia)
+  if (i < 0 || u < 0) return null
+  return (['baja', 'media', 'media', 'alta', 'urgente'] as Prioridad[])[i + u]
+}
+
+export const etiquetaImpacto = (v: string) => IMPACTOS.find((x) => x.valor === v)?.etiqueta ?? ''
+export const etiquetaUrgencia = (v: string) => URGENCIAS.find((x) => x.valor === v)?.etiqueta ?? ''
+
+export interface Servicio {
+  id: string
+  nombre: string
+  estado: 'operativo' | 'degradado' | 'caido'
+  mensaje: string
+  orden: number
+  actualizado_en: string
+}
