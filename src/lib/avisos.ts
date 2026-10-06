@@ -1,5 +1,6 @@
 import 'server-only'
 import { APP_NOMBRE } from './formato'
+import { admin } from './supabase/admin'
 
 /** Publica una tarjeta en un canal de Teams (webhook de Workflows). No hace nada si no está configurado. */
 export async function avisarTeams(titulo: string, lineas: string[], url?: string): Promise<boolean> {
@@ -42,6 +43,10 @@ export async function enviarEmail(para: string, asunto: string, texto: string): 
   const desde = process.env.EMAIL_FROM
   if (!clave || !desde || !para) return false
   try {
+    // Firma y pie editables desde Administración → Integraciones.
+    const { data: cfg } = await admin().from('config').select('valor').eq('clave', 'mails').maybeSingle()
+    const firma = String(cfg?.valor?.firma || '').trim() || `— ${APP_NOMBRE}`
+    const pie = String(cfg?.valor?.pie || '').trim()
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${clave}` },
@@ -49,7 +54,7 @@ export async function enviarEmail(para: string, asunto: string, texto: string): 
         from: desde,
         to: [para],
         subject: asunto,
-        text: `${texto}\n\n— ${APP_NOMBRE}`,
+        text: `${texto}\n\n${firma}${pie ? `\n\n${pie}` : ''}`,
         ...(process.env.EMAIL_SOPORTE ? { reply_to: process.env.EMAIL_SOPORTE } : {}),
       }),
       signal: AbortSignal.timeout(10000),

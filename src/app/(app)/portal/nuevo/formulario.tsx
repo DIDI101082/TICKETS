@@ -34,7 +34,7 @@ function Enviar() {
   )
 }
 
-export default function Formulario({ categorias, inicial }: { categorias: Categoria[]; inicial: Inicial | null }) {
+export default function Formulario({ categorias, inicial, enNombre = false }: { categorias: Categoria[]; inicial: Inicial | null; enNombre?: boolean }) {
   const [b, setB] = useState<Borrador>({ ...VACIO, ...(inicial ?? {}) })
   const [recuperado, setRecuperado] = useState(false)
   const [version, setVersion] = useState(0)
@@ -46,7 +46,7 @@ export default function Formulario({ categorias, inicial }: { categorias: Catego
 
   // Borrador: se guarda solo en este navegador. Si se llegó con un pedido precargado, no se pisa.
   useEffect(() => {
-    if (inicial) return
+    if (inicial || enNombre) return
     try {
       const guardado = JSON.parse(localStorage.getItem(CLAVE) || 'null') as Borrador | null
       if (guardado && (guardado.asunto || guardado.descripcion)) {
@@ -104,6 +104,21 @@ export default function Formulario({ categorias, inicial }: { categorias: Catego
           Recuperamos el borrador que habías empezado.
           <button type="button" onClick={descartar} className="underline">Descartarlo y empezar de cero</button>
         </p>
+      )}
+
+      {enNombre && (
+        <div className="grid gap-4 rounded-lg bg-canvas p-3 sm:grid-cols-2">
+          <div>
+            <label className="rotulo" htmlFor="solicitante_email">Mail de quien lo pide</label>
+            <input id="solicitante_email" name="solicitante_email" type="email" required className="campo" placeholder="persona@empresa.com" />
+            <p className="mt-1 text-xs text-ink/45">Si tiene cuenta, va a ver el ticket como propio. Si no, le llegan los avisos por mail.</p>
+          </div>
+          <div>
+            <label className="rotulo" htmlFor="solicitante_nombre">Nombre</label>
+            <input id="solicitante_nombre" name="solicitante_nombre" className="campo" placeholder="Si no tiene cuenta todavía" />
+            <p className="mt-1 text-xs text-ink/45">Queda registrado que lo cargaste vos, como pedido por teléfono o en persona.</p>
+          </div>
+        </div>
       )}
 
       {categorias.length > 0 && (

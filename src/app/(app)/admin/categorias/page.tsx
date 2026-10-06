@@ -5,7 +5,7 @@ import { guardarCategoria } from '../acciones'
 const aTexto = (campos: Campo[]) =>
   (campos ?? []).map((c) => [c.etiqueta, c.tipo, c.opciones.join(', '), c.requerido ? 'obligatorio' : ''].join(' | ').replace(/(\s\|\s)+$/, '')).join('\n')
 
-function Formulario({ c, sectores, orden }: { c?: Categoria; sectores: Sector[]; orden: number }) {
+function Formulario({ c, sectores, orden, mailDe }: { c?: Categoria; sectores: Sector[]; orden: number; mailDe: Map<string, string> }) {
   return (
     <form action={guardarCategoria.bind(null, c?.id ?? null)} className={`space-y-3 p-4 ${c ? 'tarjeta' : 'rounded-xl border border-dashed border-line/20'}`}>
       {!c && <h2>Nueva categoría</h2>}
@@ -48,6 +48,16 @@ function Formulario({ c, sectores, orden }: { c?: Categoria; sectores: Sector[];
         <textarea name="campos" rows={4} defaultValue={c ? aTexto(c.campos) : ''} className="campo font-mono text-[13px]" placeholder={'Sistema o servicio | texto | | obligatorio\n¿A cuántos afecta? | lista | Solo a mí, A mi equipo | obligatorio\nDetalle | párrafo'} />
         <p className="mt-1 text-xs text-ink/45">Un campo por línea: Etiqueta | tipo (texto, párrafo o lista) | opciones separadas por coma | obligatorio</p>
       </div>
+      <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+        <div>
+          <label className="rotulo">Quién aprueba (mails, en orden)</label>
+          <input name="aprobadores" defaultValue={(c?.aprobadores ?? []).map((id) => mailDe.get(id)).filter(Boolean).join(', ')} placeholder="jefe@empresa.com, seguridad@empresa.com" className="campo" />
+          <p className="mt-1 text-xs text-ink/45">Si hay más de uno, aprueban de a uno y en ese orden. Vacío: lo designa el agente en cada ticket.</p>
+        </div>
+        <label className="flex items-center gap-1.5 pb-6 text-sm">
+          <input type="checkbox" name="aprobador_jefe" defaultChecked={c?.aprobador_jefe} className="accent-brand-600" /> Primero, el jefe de quien lo pide
+        </label>
+      </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
         <label className="flex items-center gap-1.5">
           <input type="checkbox" name="requiere_aprobacion" defaultChecked={c?.requiere_aprobacion} className="accent-brand-600" /> Requiere aprobación
@@ -71,6 +81,9 @@ export default async function Categorias() {
   const [rc, rs] = await Promise.all([db.from('categorias').select('*').order('orden').order('nombre'), db.from('sectores').select('*').eq('activo', true).order('orden')])
   const categorias = (rc.data ?? []) as Categoria[]
   const sectores = (rs.data ?? []) as Sector[]
+  const ids = [...new Set(categorias.flatMap((c) => c.aprobadores ?? []))]
+  const { data: gente } = ids.length ? await db.from('perfiles').select('id,email').in('id', ids) : { data: [] }
+  const mailDe = new Map((gente ?? []).map((g) => [g.id as string, g.email as string]))
   return (
     <div className="space-y-5">
       <div>
@@ -80,9 +93,9 @@ export default async function Categorias() {
         </p>
       </div>
       {categorias.map((c) => (
-        <Formulario key={c.id} c={c} sectores={sectores} orden={c.orden} />
+        <Formulario key={c.id} c={c} sectores={sectores} orden={c.orden} mailDe={mailDe} />
       ))}
-      <Formulario sectores={sectores} orden={categorias.length + 1} />
+      <Formulario sectores={sectores} orden={categorias.length + 1} mailDe={mailDe} />
     </div>
   )
 }

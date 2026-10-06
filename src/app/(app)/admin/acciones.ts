@@ -20,6 +20,7 @@ export async function guardarSector(id: string | null, form: FormData) {
     descripcion: texto(form.get('descripcion'), 1000),
     orden: entero(form.get('orden'), 0),
     responsable_id: uuid(form.get('responsable_id')),
+    asignacion: ['turno', 'carga'].includes(String(form.get('asignacion'))) ? String(form.get('asignacion')) : 'manual',
     activo: id ? form.get('activo') === 'on' : true,
   }
   if (!fila.nombre) return
@@ -127,9 +128,17 @@ export async function guardarCategoria(id: string | null, form: FormData) {
     confidencial: form.get('confidencial') === 'on',
     orden: entero(form.get('orden'), 0),
     activo: id ? form.get('activo') === 'on' : true,
+    aprobador_jefe: form.get('aprobador_jefe') === 'on',
+    aprobadores: [] as string[],
   }
   if (!fila.nombre) return
   const db = admin()
+  // Aprobadores por mail, en el orden en que tienen que aprobar. Solo se guardan los que tienen cuenta.
+  const mails = String(form.get('aprobadores') || '').toLowerCase().split(/[,;\s]+/).filter((m) => m.includes('@')).slice(0, 5)
+  if (mails.length) {
+    const { data: gente } = await db.from('perfiles').select('id,email').in('email', mails)
+    fila.aprobadores = mails.map((m) => (gente ?? []).find((g) => String(g.email).toLowerCase() === m)?.id).filter((x): x is string => !!x)
+  }
   const { error } = id ? await db.from('categorias').update(fila).eq('id', id) : await db.from('categorias').insert(fila)
   if (error) throw new Error(`No se pudo guardar la categoría: ${error.message}`)
   await auditar(perfil, id ? 'Modificó categoría' : 'Creó categoría', 'categoria', fila.nombre)
@@ -164,6 +173,15 @@ export async function guardarUsuario(id: string, form: FormData) {
   const cambios: Record<string, string | boolean | null> = {
     organizacion_id: uuid(form.get('organizacion_id')),
     ve_organizacion: form.get('ve_organizacion') === 'on',
+    supervisor: form.get('supervisor') === 'on',
+    ausente_hasta: /^\d{4}-\d{2}-\d{2}$/.test(String(form.get('ausente_hasta'))) ? String(form.get('ausente_hasta')) : null,
+  }
+  // El jefe se carga por mail; se usa como primer aprobador en las categorías que lo piden.
+  const jefeMail = String(form.get('jefe') || '').trim().toLowerCase()
+  if (!jefeMail) cambios.jefe_id = null
+  else {
+    const { data: jefe } = await db.from('perfiles').select('id').ilike('email', jefeMail).maybeSingle()
+    if (jefe && jefe.id !== id) cambios.jefe_id = jefe.id
   }
   if (['interno', 'externo'].includes(tipo)) cambios.tipo = tipo
   // Un admin no puede quitarse a sí mismo el rol, para no dejar el sistema sin administradores.
@@ -216,7 +234,13 @@ export async function eliminarProgramado(id: string) {
 
 export async function guardarPlantilla(id: string | null, form: FormData) {
   await exigirStaff()
-  const fila = { titulo: texto(form.get('titulo'), 80), cuerpo: String(form.get('cuerpo') || '').trim().slice(0, 5000) }
+  const tras = String(form.get('estado_tras') || '')
+  const fila = {
+    titulo: texto(form.get('titulo'), 80),
+    cuerpo: String(form.get('cuerpo') || '').trim().slice(0, 5000),
+    estado_tras: ['en_espera', 'resuelto'].includes(tras) ? tras : '',
+    nota_interna: form.get('nota_interna') === 'on',
+  }
   if (!fila.titulo || !fila.cuerpo) return
   const db = admin()
   const { error } = id ? await db.from('plantillas').update(fila).eq('id', id) : await db.from('plantillas').insert(fila)

@@ -1,5 +1,7 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { exigirStaff } from '@/lib/auth'
+import { leerMantenimiento } from '@/lib/config'
 import { duracion } from '@/lib/formato'
 import { pct, promedio } from '@/lib/metricas'
 import { ACTIVOS, type Sector, type Ticket } from '@/lib/tipos'
@@ -34,16 +36,17 @@ function Barras({ filas }: { filas: { etiqueta: string; valor: number }[] }) {
 }
 
 export default async function Tablero() {
-  const { db } = await exigirStaff()
+  const { db, supervisor } = await exigirStaff()
+  if ((await leerMantenimiento()).tablero_solo_supervisores && !supervisor) redirect('/agente')
   const [rt, rs, rp, ro] = await Promise.all([
     db.from('tickets').select('*').order('creado_en', { ascending: false }).limit(5000),
     db.from('sectores').select('*').order('orden'),
-    db.from('perfiles').select('id,nombre,email').in('rol', ['admin', 'agente']),
+    db.from('perfiles').select('id,nombre,email,ausente_hasta').in('rol', ['admin', 'agente']).eq('activo', true),
     db.from('organizaciones').select('id,nombre').order('nombre'),
   ])
   const tickets = ((rt.data ?? []) as Ticket[]).filter((t) => !t.fusionado_en_id)
   const sectores = (rs.data ?? []) as Sector[]
-  const agentes = (rp.data ?? []) as { id: string; nombre: string; email: string }[]
+  const agentes = (rp.data ?? []) as { id: string; nombre: string; email: string; ausente_hasta: string | null }[]
   const orgs = (ro.data ?? []) as { id: string; nombre: string }[]
 
   const ahora = Date.now()
@@ -78,13 +81,16 @@ export default async function Tablero() {
     .map((a) => {
       const suyos = calificados.filter((t) => t.asignado_id === a.id)
       return {
+        id: a.id,
         nombre: a.nombre || a.email,
+        ausente: !!a.ausente_hasta && new Date(`${a.ausente_hasta}T23:59:59-03:00`).getTime() >= ahora,
+        porVencer: activos.filter((t) => t.asignado_id === a.id && t.estado !== 'en_espera' && t.vence_resolucion && ms(t.vence_resolucion) < ahora + 4 * 3600000).length,
         activos: activos.filter((t) => t.asignado_id === a.id).length,
         resueltos: resueltos30.filter((t) => t.asignado_id === a.id).length,
         csat: promedio(suyos.map((t) => t.csat_puntaje!)),
       }
     })
-    .filter((a) => a.activos || a.resueltos)
+    .filter((a) => a.activos || a.resueltos || a.ausente)
     .sort((a, b) => b.activos - a.activos)
 
   const edad = (t: Ticket) => (ahora - ms(t.creado_en)) / 86400000
@@ -139,7 +145,8 @@ export default async function Tablero() {
           <Barras filas={antiguedad} />
         </section>
         <section className="tarjeta overflow-x-auto p-4">
-          <h2 className="mb-2">Por agente</h2>
+          <h2 className="mb-1">Carga por agente</h2>
+          <p className="mb-2 text-xs text-ink/50">Tocá un nombre para ver sus tickets y reasignarlos en lote.</p>
           {porAgente.length === 0 ? (
             <p className="text-sm text-ink/50">Todavía no hay tickets asignados.</p>
           ) : (
@@ -148,6 +155,7 @@ export default async function Tablero() {
                 <tr>
                   <th>Agente</th>
                   <th className="!text-right">Activos</th>
+                  <th className="!text-right">Vencen en 4 h</th>
                   <th className="!text-right">Resueltos</th>
                   <th className="!text-right">Satisfacción</th>
                 </tr>
@@ -155,8 +163,12 @@ export default async function Tablero() {
               <tbody>
                 {porAgente.map((a) => (
                   <tr key={a.nombre}>
-                    <td>{a.nombre}</td>
+                    <td>
+                      <Link href={`/agente?asignado=${a.id}`} className="hover:text-brand-600 hover:underline">{a.nombre}</Link>
+                      {a.ausente && <span className="pill ml-2 bg-amber-500/10 text-amber-700">Ausente</span>}
+                    </td>
                     <td className="text-right tabular-nums">{a.activos}</td>
+                    <td className={`text-right tabular-nums ${a.porVencer ? 'font-medium text-red-700' : ''}`}>{a.porVencer}</td>
                     <td className="text-right tabular-nums">{a.resueltos}</td>
                     <td className="text-right tabular-nums">{a.csat == null ? '—' : a.csat.toFixed(1)}</td>
                   </tr>

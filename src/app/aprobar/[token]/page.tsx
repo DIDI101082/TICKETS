@@ -9,7 +9,7 @@ import type { Ticket } from '@/lib/tipos'
 
 async function buscar(token: string) {
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) return null
-  const { data } = await admin().from('tickets').select('*').eq('aprobacion_token', token).eq('aprobacion_estado', 'pendiente').maybeSingle()
+  const { data } = await admin().from('tickets').select('*').eq('aprobacion_token', token).eq('aprobacion_estado', 'pendiente').is('eliminado_en', null).maybeSingle()
   return (data as Ticket | null) ?? null
 }
 

@@ -23,6 +23,11 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
             Tu cuenta existe pero no tiene perfil. Avisale al administrador: falta ejecutar el esquema de la base.
           </p>
         )}
+        {error === 'inactiva' && (
+          <p className="mt-5 rounded-lg border border-red-300/30 bg-red-500/25 px-3 py-2 text-sm text-red-100" role="alert">
+            Tu cuenta está desactivada. Si creés que es un error, hablá con el administrador de la mesa de ayuda.
+          </p>
+        )}
         {error === 'acceso' && (
           <p className="mt-5 rounded-lg border border-red-300/30 bg-red-500/25 px-3 py-2 text-sm text-red-100" role="alert">
             No se pudo completar el ingreso. Probá de nuevo.

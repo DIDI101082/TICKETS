@@ -4,6 +4,9 @@ import { clasificar } from './ia'
 import { avisarTeams, enviarEmail } from './avisos'
 import { avisarInteresados, avisarPersona } from './notificar'
 import { leerOpciones } from './config'
+import { aplicarReglas } from './reglas'
+import { elegirAgente } from './asignacion'
+import { solicitarAprobacion } from './aprobaciones'
 import { claves, coincidencias } from './texto'
 import { APP_URL } from './formato'
 import { etiquetaPrioridad, prioridadPorImpacto, type Canal, type Categoria, type Dato, type Prioridad, type Ticket } from './tipos'
@@ -101,6 +104,16 @@ export async function crearTicket(e: {
     prioridad = prioridad ?? c.prioridad
   }
 
+  // Reglas automáticas definidas por el administrador: pueden cambiar prioridad, sector, asignado y confidencialidad.
+  const reglas = await aplicarReglas({ categoriaId: categoria?.id ?? null, organizacionId, sectorId, canal: e.canal, texto: `${e.asunto}\n${e.descripcion}` })
+  if (reglas.sector_id) {
+    sectorId = reglas.sector_id
+    origen = `Sector definido por la regla "${reglas.aplicadas.at(-1)}"`
+  }
+  if (reglas.prioridad) prioridad = reglas.prioridad
+  // Reparto automático del sector (por turno o por carga), salvo que una regla ya haya asignado a alguien.
+  const asignadoId = reglas.asignado_id ?? (await elegirAgente(sectorId))
+
   const { data, error } = await db
     .from('tickets')
     .insert({
@@ -111,12 +124,13 @@ export async function crearTicket(e: {
       solicitante_email: email,
       solicitante_nombre: e.nombre,
       sector_id: sectorId,
+      asignado_id: asignadoId,
       prioridad: prioridad ?? 'media',
       organizacion_id: organizacionId,
       categoria_id: categoria?.id ?? null,
       datos,
       equipo: datos.find((d) => /inventario|equipo/i.test(d.etiqueta))?.valor.slice(0, 80) ?? '',
-      confidencial: categoria?.confidencial ?? false,
+      confidencial: (categoria?.confidencial ?? false) || !!reglas.confidencial,
       aprobacion_estado: categoria?.requiere_aprobacion ? 'pendiente' : 'no_requiere',
       clave_externa: e.claveExterna ?? null,
       impacto: e.impacto ?? '',
@@ -138,7 +152,29 @@ export async function crearTicket(e: {
     'Sistema',
     sector ? `Sector ${sector}. ${origen}` : `Sin derivar, queda en triage. ${ia.sugerido ? `Sugerencia de la IA: ${ia.sugerido}. ` : ''}${ia.motivo}`,
   )
-  if (t.aprobacion_estado === 'pendiente') await registrarEvento(t.id, 'Sistema', 'Requiere aprobación: falta designar quién aprueba')
+  if (reglas.aplicadas.length) await registrarEvento(t.id, 'Sistema', `Reglas aplicadas: ${reglas.aplicadas.join(', ')}`)
+  if (asignadoId) {
+    const { data: ag } = await db.from('perfiles').select('nombre,email').eq('id', asignadoId).maybeSingle()
+    await registrarEvento(t.id, 'Sistema', `Asignado automáticamente a ${ag?.nombre || ag?.email || 'un agente'}`)
+    await avisarPersona({ perfilId: asignadoId, ticket: t, tipo: 'otro', titulo: 'Te asignaron un ticket', texto: `Se te asignó el pedido #${t.numero}: ${t.asunto}` })
+  }
+  for (const destino of reglas.avisos) {
+    await enviarEmail(destino, `[#${t.numero}] Aviso por regla: ${t.confidencial ? '(confidencial)' : t.asunto}`, `Entró un pedido que cumple una regla (${reglas.aplicadas.join(', ')}).\n\n${APP_URL}/tickets/${t.id}`)
+  }
+
+  // Aprobación: primero el jefe del solicitante (si la categoría lo pide) y después los aprobadores de la categoría, en orden.
+  if (t.aprobacion_estado === 'pendiente') {
+    const cola: string[] = []
+    if (categoria?.aprobador_jefe && e.solicitanteId) {
+      const { data: sol } = await db.from('perfiles').select('jefe_id').eq('id', e.solicitanteId).maybeSingle()
+      if (sol?.jefe_id) cola.push(sol.jefe_id)
+    }
+    for (const id of categoria?.aprobadores ?? []) if (!cola.includes(id) && id !== e.solicitanteId) cola.push(id)
+    const { data: validos } = cola.length ? await db.from('perfiles').select('id,nombre,email').in('id', cola).eq('activo', true) : { data: [] }
+    const enOrden = cola.map((id) => (validos ?? []).find((p) => p.id === id)).filter((p): p is { id: string; nombre: string; email: string } => !!p)
+    if (enOrden.length) await solicitarAprobacion(t, enOrden[0], 'Sistema', enOrden.slice(1).map((p) => p.id))
+    else await registrarEvento(t.id, 'Sistema', 'Requiere aprobación: falta designar quién aprueba')
+  }
 
   const url = `${APP_URL}/tickets/${t.id}`
   const copia = [...new Set(e.seguidores ?? [])].filter((id) => id !== t.solicitante_id && id !== t.beneficiario_id)
@@ -182,7 +218,7 @@ async function detectarIncidente(t: Ticket, sector: string | null) {
     if (op.incidente_cantidad < 2) return
     const db = admin()
     const desde = new Date(Date.now() - op.incidente_minutos * 60000).toISOString()
-    let q = db.from('tickets').select('id,asunto').neq('id', t.id).gte('creado_en', desde).limit(200)
+    let q = db.from('tickets').select('id,asunto').neq('id', t.id).is('eliminado_en', null).gte('creado_en', desde).limit(200)
     q = t.sector_id ? q.eq('sector_id', t.sector_id) : q.is('sector_id', null)
     const { data } = await q
     const mias = claves(t.asunto)

@@ -9,6 +9,8 @@ import { fecha, slaRespuesta, slaResolucion, tamano } from '@/lib/formato'
 import { InsigniaEstado, InsigniaPrioridad, TextoSla } from '@/components/Insignias'
 import { ESTADOS, PRIORIDADES, etiquetaImpacto, etiquetaUrgencia, type Adjunto, type Mensaje, type Sector, type Ticket } from '@/lib/tipos'
 import Pasos from '@/components/Pasos'
+import Presencia from '@/components/Presencia'
+import { enviarAPapelera, registrarTiempo } from '../../acciones'
 import Respuesta from './Respuesta'
 import { agregarSeguidor, quitarSeguidor, reabrir, actualizar, calificar, cerrarPropio, decidirAprobacion, desvincular, fusionar, generarResumen, pedirAprobacion, tomar, vincular } from './acciones'
 
@@ -69,7 +71,7 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
     db.from('sectores').select('*').order('orden'),
     staff ? db.from('perfiles').select('id,nombre,email').in('rol', ['admin', 'agente']).order('nombre') : nada,
     staff ? db.from('eventos').select('*').eq('ticket_id', id).order('creado_en', { ascending: false }).limit(40) : nada,
-    staff ? db.from('plantillas').select('id,titulo,cuerpo').order('titulo') : nada,
+    staff ? db.from('plantillas').select('id,titulo,cuerpo,estado_tras,nota_interna').order('titulo') : nada,
     db.from('tickets').select('id,numero,asunto,estado').eq('padre_id', id).order('numero'),
     staff ? db.from('tickets').select('id,numero,asunto,estado').in('estado', ['resuelto', 'cerrado']).neq('id', id).order('creado_en', { ascending: false }).limit(400) : nada,
     staff && t.equipo ? db.from('tickets').select('id,numero,asunto,estado').eq('equipo', t.equipo).neq('id', id).order('creado_en', { ascending: false }).limit(10) : nada,
@@ -113,7 +115,9 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
   const esAprobador = t.aprobador_id === perfil.id
   const puedeResponder = !t.fusionado_en_id && (staff || t.estado !== 'cerrado')
   const terminado = t.estado === 'resuelto' || t.estado === 'cerrado'
-  const plantillas = ((rpl.data ?? []) as { id: string; titulo: string; cuerpo: string }[]).map((p) => ({
+  const { data: rtiempos } = staff ? await db.from('tiempos').select('id,autor_nombre,minutos,nota,creado_en').eq('ticket_id', id).order('creado_en', { ascending: false }).limit(20) : { data: [] }
+  const tiempos = (rtiempos ?? []) as { id: string; autor_nombre: string; minutos: number; nota: string; creado_en: string }[]
+  const plantillas = ((rpl.data ?? []) as { id: string; titulo: string; cuerpo: string; estado_tras: string; nota_interna: boolean }[]).map((p) => ({
     ...p,
     cuerpo: rellenar(p.cuerpo, { nombre: (t.solicitante_nombre || '').split(' ')[0], numero: String(t.numero), asunto: t.asunto }),
   }))
@@ -226,6 +230,7 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
             </article>
           ))}
 
+          {staff && puedeResponder && <Presencia ticketId={t.id} />}
           {puedeResponder ? (
             <Respuesta ticketId={t.id} staff={staff} plantillas={plantillas} ia={staff && iaDisponible()} />
           ) : (
@@ -497,6 +502,28 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
               )}
             </div>
 
+            <div className="tarjeta space-y-2 p-4 text-sm">
+              <div className="flex items-baseline justify-between gap-2">
+                <h2>Tiempo trabajado</h2>
+                <span className="font-medium tabular-nums">{t.minutos_trabajados ? `${Math.floor(t.minutos_trabajados / 60)} h ${t.minutos_trabajados % 60} min` : 'Sin registrar'}</span>
+              </div>
+              <form action={registrarTiempo.bind(null, t.id)} className="flex gap-2">
+                <input name="minutos" type="number" min={1} max={1440} required placeholder="Min" className="campo w-20" aria-label="Minutos" />
+                <input name="nota" placeholder="En qué (opcional)" className="campo" />
+                <button className="btn-sec shrink-0 px-3">Sumar</button>
+              </form>
+              {tiempos.length > 0 && (
+                <ul className="space-y-1 pt-1 text-xs text-ink/60">
+                  {tiempos.map((x) => (
+                    <li key={x.id}>
+                      <span className="font-medium text-ink/80">{x.minutos} min</span> · {x.autor_nombre} · {fecha(x.creado_en)}
+                      {x.nota ? ` · ${x.nota}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             {(t.equipo || delEquipo.length > 0) && (
               <div className="tarjeta space-y-2 p-4 text-sm">
                 <h2>Equipo {t.equipo}</h2>
@@ -535,6 +562,12 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
               )}
               {t.ia_motivo && <p className="text-ink/60">{t.ia_motivo}</p>}
             </div>
+
+            {esAdmin && (
+              <form action={enviarAPapelera.bind(null, t.id)}>
+                <button className="text-xs text-ink/50 underline-offset-2 hover:text-red-700 hover:underline">Enviar este ticket a la papelera</button>
+              </form>
+            )}
 
             {eventos.length > 0 && (
               <div className="tarjeta p-4 text-sm">

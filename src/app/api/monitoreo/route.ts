@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
     .from('tickets')
     .select('id,numero')
     .eq('clave_externa', clave)
+    .is('eliminado_en', null)
     .in('estado', ['abierto', 'en_curso', 'en_espera'])
     .order('creado_en', { ascending: false })
     .limit(1)

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Mark from './Mark'
 import { alternarTema, estaOscuro } from '@/lib/tema'
-import { marcarLeidas } from '@/app/(app)/acciones'
+import { alternarVista, marcarLeidas } from '@/app/(app)/acciones'
 
 export interface Aviso {
   id: string
@@ -36,21 +36,39 @@ function iniciales(nombre: string) {
 
 const dentro = (pathname: string, ruta: string) => pathname === ruta || pathname.startsWith(ruta + '/')
 
-export default function Nav({ nombre, email, rol, avisos, sinLeer }: { nombre: string; email: string; rol: string; avisos: Aviso[]; sinLeer: number }) {
+export default function Nav({
+  nombre,
+  email,
+  rol,
+  rolReal,
+  verTablero,
+  avisos,
+  sinLeer,
+}: {
+  nombre: string
+  email: string
+  rol: string
+  rolReal: string
+  verTablero: boolean
+  avisos: Aviso[]
+  sinLeer: number
+}) {
   const pathname = usePathname()
   const staff = rol !== 'usuario'
 
   const solapas: Solapa[] = staff
     ? [
         { href: '/agente', label: 'Bandeja', tambien: ['/tickets'] },
-        {
+        ...(verTablero ? [{
           href: '/tablero',
           label: 'Tablero',
           paginas: [
             { href: '/tablero', label: 'Situación actual' },
             { href: '/tablero/reportes', label: 'Reportes por período' },
+            { href: '/guardias', label: 'Guardias y ausencias' },
           ],
-        },
+          tambien: ['/guardias'],
+        }] : []),
         {
           href: '/kb',
           label: 'Conocimiento',
@@ -71,7 +89,10 @@ export default function Nav({ nombre, email, rol, avisos, sinLeer }: { nombre: s
                   { href: '/admin/categorias', label: 'Categorías' },
                   { href: '/admin/organizaciones', label: 'Organizaciones' },
                   { href: '/admin/personas', label: 'Personas' },
+                  { href: '/admin/reglas', label: 'Reglas' },
                   { href: '/admin/programados', label: 'Programados' },
+                  { href: '/admin/integraciones', label: 'Integraciones' },
+                  { href: '/admin/datos', label: 'Datos' },
                   { href: '/admin/auditoria', label: 'Auditoría' },
                 ],
               },
@@ -122,7 +143,7 @@ export default function Nav({ nombre, email, rol, avisos, sinLeer }: { nombre: s
             Nuevo ticket
           </Link>
           <Campana avisos={avisos} sinLeer={sinLeer} />
-          <MenuUsuario nombre={nombre || email} email={email} rol={rol} />
+          <MenuUsuario nombre={nombre || email} email={email} rol={rol} rolReal={rolReal} />
         </div>
       </div>
 
@@ -151,7 +172,7 @@ export default function Nav({ nombre, email, rol, avisos, sinLeer }: { nombre: s
   )
 }
 
-function MenuUsuario({ nombre, email, rol }: { nombre: string; email: string; rol: string }) {
+function MenuUsuario({ nombre, email, rol, rolReal }: { nombre: string; email: string; rol: string; rolReal: string }) {
   const [abierto, setAbierto] = useState(false)
   const [oscuro, setOscuro] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -196,6 +217,13 @@ function MenuUsuario({ nombre, email, rol }: { nombre: string; email: string; ro
             <Link href="/portal" onClick={() => setAbierto(false)} className="mt-1 block rounded-md px-2.5 py-1.5 text-sm text-ink/70 hover:bg-line/[0.04] hover:text-ink">
               Mis pedidos y aprobaciones
             </Link>
+          )}
+          {rolReal !== 'usuario' && (
+            <form action={alternarVista}>
+              <button className="mt-1 block w-full rounded-md px-2.5 py-1.5 text-left text-sm text-ink/70 hover:bg-line/[0.04] hover:text-ink">
+                {rol === 'usuario' ? 'Volver a mi vista' : 'Ver como usuario'}
+              </button>
+            </form>
           )}
           <Link href="/cuenta" onClick={() => setAbierto(false)} className="mt-1 block rounded-md px-2.5 py-1.5 text-sm text-ink/70 hover:bg-line/[0.04] hover:text-ink">
             Mi cuenta y avisos

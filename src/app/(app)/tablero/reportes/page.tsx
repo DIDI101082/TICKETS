@@ -1,5 +1,7 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { exigirStaff } from '@/lib/auth'
+import { leerMantenimiento } from '@/lib/config'
 import { duracion, APP_NOMBRE } from '@/lib/formato'
 import { indicadores, type Fila } from '@/lib/metricas'
 import BotonImprimir from '@/components/BotonImprimir'
@@ -49,7 +51,8 @@ function Tabla({ titulo, primera, filas }: { titulo: string; primera: string; fi
 
 export default async function Reportes({ searchParams }: { searchParams: Promise<{ desde?: string; hasta?: string }> }) {
   const sp = await searchParams
-  const { db } = await exigirStaff()
+  const { db, supervisor } = await exigirStaff()
+  if ((await leerMantenimiento()).tablero_solo_supervisores && !supervisor) redirect('/agente')
 
   const hoy = new Date()
   const hasta = esFecha(sp.hasta) ? sp.hasta! : dia(hoy)
@@ -78,6 +81,24 @@ export default async function Reportes({ searchParams }: { searchParams: Promise
     ].filter((f) => f.creados > 0)
 
   const total = indicadores('Total', tickets)
+  const horas = Math.round(tickets.reduce((n, t) => n + (t.minutos_trabajados ?? 0), 0) / 6) / 10
+
+  // Calidad de la derivación: de los tickets en que la IA sugirió un sector, cuántos siguen en ese sector.
+  const nombreSector = new Map((rs.data ?? []).map((s) => [s.id as string, s.nombre as string]))
+  const conIa = tickets.filter((t) => t.ia_sector)
+  const acierta = (t: Ticket) => !!t.sector_id && nombreSector.get(t.sector_id) === t.ia_sector
+  const calidad = [...new Set(conIa.map((t) => t.ia_sector!))]
+    .map((sugerido) => {
+      const suyos = conIa.filter((t) => t.ia_sector === sugerido)
+      const destinos = new Map<string, number>()
+      for (const t of suyos.filter((x) => !acierta(x))) {
+        const d = t.sector_id ? nombreSector.get(t.sector_id) ?? 'Otro' : 'Triage'
+        destinos.set(d, (destinos.get(d) ?? 0) + 1)
+      }
+      return { sugerido, total: suyos.length, bien: suyos.filter(acierta).length, destinos: [...destinos.entries()].sort((a, b) => b[1] - a[1]) }
+    })
+    .sort((a, b) => b.total - a.total)
+  const bienTotal = conIa.filter(acierta).length
   const maxMes = Math.max(1, ...meses.map((m) => tickets.filter((t) => mes(t.creado_en) === m).length))
 
   return (
@@ -106,13 +127,14 @@ export default async function Reportes({ searchParams }: { searchParams: Promise
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         {[
+          ['Satisfacción', total.csat == null ? '—' : `${total.csat.toFixed(1)} / 5`],
           ['Creados', total.creados],
           ['Resueltos', total.resueltos],
           ['SLA de respuesta', total.slaResp],
           ['SLA de resolución', total.slaResol],
-          ['Satisfacción', total.csat == null ? '—' : `${total.csat.toFixed(1)} / 5`],
+          ['Horas registradas', horas],
         ].map(([t, v]) => (
           <div key={t} className="tarjeta p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">{t}</p>
@@ -154,6 +176,39 @@ export default async function Reportes({ searchParams }: { searchParams: Promise
       <Tabla titulo="Por organización" primera="Organización" filas={agrupar(ro.data ?? [], (o) => o.nombre, 'organizacion_id', 'Sin organización')} />
       <Tabla titulo="Por categoría" primera="Categoría" filas={agrupar(rc.data ?? [], (c) => c.nombre, 'categoria_id', 'Sin categoría')} />
       <Tabla titulo="Por agente" primera="Agente" filas={agrupar(rp.data ?? [], (a) => a.nombre || a.email, 'asignado_id', 'Sin asignar')} />
+
+      <section className="tarjeta overflow-x-auto break-inside-avoid">
+        <div className="px-4 pt-4">
+          <h2>Calidad de la derivación por IA</h2>
+          <p className="text-sm text-ink/60">
+            {conIa.length === 0
+              ? 'La IA no sugirió sector para ningún ticket del período.'
+              : `De ${conIa.length} tickets con sugerencia, ${bienTotal} (${Math.round((bienTotal / conIa.length) * 100)}%) siguen en el sector que propuso. Donde más se corrige, conviene ajustar la descripción del sector.`}
+          </p>
+        </div>
+        {calidad.length > 0 && (
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Sector sugerido</th>
+                <th className="!text-right">Sugerencias</th>
+                <th className="!text-right">Coincidió</th>
+                <th>Cuando no, terminó en</th>
+              </tr>
+            </thead>
+            <tbody>
+              {calidad.map((c) => (
+                <tr key={c.sugerido}>
+                  <td className="font-medium">{c.sugerido}</td>
+                  <td className="text-right tabular-nums">{c.total}</td>
+                  <td className="text-right tabular-nums">{Math.round((c.bien / c.total) * 100)}%</td>
+                  <td className="text-ink/70">{c.destinos.length ? c.destinos.map(([d, n]) => `${d} (${n})`).join(', ') : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
 
       <p className="text-xs text-ink/45">
         El tiempo de resolución descuenta el tiempo en espera. La satisfacción es el promedio de las encuestas respondidas (cantidad entre paréntesis).

@@ -4,7 +4,9 @@ import { exigirStaff } from '@/lib/auth'
 import { revisarSiToca } from '@/lib/sla'
 import { hace, slaRespuesta, slaResolucion } from '@/lib/formato'
 import { InsigniaEstado, InsigniaPrioridad, TextoSla } from '@/components/Insignias'
+import Lote from '@/components/Lote'
 import { ACTIVOS, ESTADOS, type Sector, type Ticket } from '@/lib/tipos'
+import { accionEnLote, eliminarVista, guardarVista } from '../acciones'
 
 const VISTAS = [
   { valor: 'activos', texto: 'Activos' },
@@ -18,32 +20,33 @@ const VISTAS = [
 ]
 
 const PESO: Record<string, number> = { urgente: 0, alta: 1, media: 2, baja: 3 }
+const FILTROS = ['vista', 'estado', 'sector', 'org', 'cat', 'asignado', 'q'] as const
+type Params = Partial<Record<(typeof FILTROS)[number], string>>
 
-export default async function Bandeja({
-  searchParams,
-}: {
-  searchParams: Promise<{ vista?: string; estado?: string; sector?: string; org?: string; cat?: string; q?: string }>
-}) {
+export default async function Bandeja({ searchParams }: { searchParams: Promise<Params> }) {
   const sp = await searchParams
-  const { db, perfil } = await exigirStaff()
+  const { db, perfil, esAdmin } = await exigirStaff()
   const vista = VISTAS.some((v) => v.valor === sp.vista) ? sp.vista! : 'activos'
 
-  // Avisos de SLA, escalamiento y programados: corre después de responder, como mucho cada 10 minutos.
+  // Avisos de SLA, escalamiento, programados y mantenimiento: después de responder, como mucho cada 10 minutos.
   after(revisarSiToca)
 
-  const [rs, rp, rmis, rorg, rcat] = await Promise.all([
+  const [rs, rp, rmis, rorg, rcat, rv] = await Promise.all([
     db.from('sectores').select('*').order('orden'),
-    db.from('perfiles').select('id,nombre,email').in('rol', ['admin', 'agente']),
+    db.from('perfiles').select('id,nombre,email').in('rol', ['admin', 'agente']).eq('activo', true).order('nombre'),
     db.from('agente_sectores').select('sector_id').eq('perfil_id', perfil.id),
     db.from('organizaciones').select('id,nombre').order('nombre'),
     db.from('categorias').select('id,nombre').order('orden'),
+    db.from('vistas').select('*').order('nombre'),
   ])
   const sectores = (rs.data ?? []) as Sector[]
   const orgs = (rorg.data ?? []) as { id: string; nombre: string }[]
   const cats = (rcat.data ?? []) as { id: string; nombre: string }[]
+  const agentes = ((rp.data ?? []) as { id: string; nombre: string; email: string }[]).map((a) => ({ id: a.id, nombre: a.nombre || a.email }))
+  const guardadas = (rv.data ?? []) as { id: string; nombre: string; consulta: string }[]
   const nombreSector = new Map(sectores.map((s) => [s.id, s.nombre]))
   const nombreOrg = new Map(orgs.map((o) => [o.id, o.nombre]))
-  const nombreAgente = new Map((rp.data ?? []).map((a) => [a.id as string, (a.nombre || a.email) as string]))
+  const nombreAgente = new Map(agentes.map((a) => [a.id, a.nombre]))
   const misSectores = (rmis.data ?? []).map((x) => x.sector_id as string)
 
   let q = db.from('tickets').select('*').order('creado_en', { ascending: false }).limit(300)
@@ -59,6 +62,7 @@ export default async function Bandeja({
   if (sp.sector) q = q.eq('sector_id', sp.sector)
   if (sp.org) q = q.eq('organizacion_id', sp.org)
   if (sp.cat) q = q.eq('categoria_id', sp.cat)
+  if (sp.asignado) q = q.eq('asignado_id', sp.asignado)
 
   const busqueda = (sp.q ?? '').trim()
   if (/^#?\d+$/.test(busqueda)) q = q.eq('numero', Number(busqueda.replace('#', '')))
@@ -73,6 +77,12 @@ export default async function Bandeja({
   )
   const incidentes = vista === 'incidentes' ? 0 : tickets.filter((t) => t.incidente && ACTIVOS.includes(t.estado)).length
 
+  // La consulta actual, para guardarla como vista y para volver después de una acción en lote.
+  const actual = new URLSearchParams()
+  for (const k of FILTROS) if (sp[k]) actual.set(k, sp[k]!)
+  const consulta = actual.toString()
+  const conFiltros = [...actual.keys()].some((k) => k !== 'vista') || vista !== 'activos'
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -82,11 +92,17 @@ export default async function Bandeja({
         </div>
         <form className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="vista" value={vista} />
-          <input name="q" defaultValue={busqueda} placeholder="N.º, asunto, solicitante o equipo" className="campo w-60" />
+          <input name="q" defaultValue={busqueda} placeholder="N.º, asunto, solicitante o equipo" className="campo w-56" />
           <select name="sector" defaultValue={sp.sector ?? ''} className="campo w-auto" aria-label="Sector">
             <option value="">Todos los sectores</option>
             {sectores.map((s) => (
               <option key={s.id} value={s.id}>{s.nombre}</option>
+            ))}
+          </select>
+          <select name="asignado" defaultValue={sp.asignado ?? ''} className="campo w-auto" aria-label="Agente">
+            <option value="">Todos los agentes</option>
+            {agentes.map((a) => (
+              <option key={a.id} value={a.id}>{a.nombre}</option>
             ))}
           </select>
           {orgs.length > 0 && (
@@ -126,20 +142,44 @@ export default async function Bandeja({
           <Link
             key={v.valor}
             href={`/agente?vista=${v.valor}`}
-            className={`-mb-px border-b-2 px-3 py-2 ${vista === v.valor ? 'border-brand-500 font-medium text-brand-600' : 'border-transparent text-ink/55 hover:text-ink'}`}
+            className={`-mb-px border-b-2 px-3 py-2 ${vista === v.valor && !conFiltros ? 'border-brand-500 font-medium text-brand-600' : vista === v.valor ? 'border-brand-300 text-brand-600' : 'border-transparent text-ink/55 hover:text-ink'}`}
           >
             {v.texto}
           </Link>
         ))}
       </nav>
 
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-ink/50">Mis vistas:</span>
+        {guardadas.length === 0 && <span className="text-ink/45">todavía no guardaste ninguna.</span>}
+        {guardadas.map((v) => (
+          <span key={v.id} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 ${v.consulta === consulta ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-line/10 bg-surface'}`}>
+            <Link href={`/agente?${v.consulta}`} className="hover:underline">{v.nombre}</Link>
+            <form action={eliminarVista.bind(null, v.id)}>
+              <button aria-label={`Eliminar la vista ${v.nombre}`} className="text-ink/40 hover:text-red-700">×</button>
+            </form>
+          </span>
+        ))}
+        {conFiltros && !guardadas.some((v) => v.consulta === consulta) && (
+          <form action={guardarVista} className="flex items-center gap-1.5">
+            <input type="hidden" name="consulta" value={consulta} />
+            <input name="nombre" required maxLength={40} placeholder="Nombre para estos filtros" className="campo w-48 py-1" />
+            <button className="btn-sec px-3 py-1">Guardar vista</button>
+          </form>
+        )}
+        <Link href="/portal/nuevo?para=otro" className="ml-auto text-brand-600 hover:underline">Cargar un ticket para otra persona</Link>
+      </div>
+
       {tickets.length === 0 ? (
         <p className="tarjeta p-8 text-center text-sm text-ink/60">No hay tickets en esta vista.</p>
       ) : (
-        <div className="tarjeta overflow-x-auto">
+        <form id="lote" action={accionEnLote} className="tarjeta overflow-x-auto">
+          <input type="hidden" name="volver" value={`/agente${consulta ? `?${consulta}` : ''}`} />
+          <Lote sectores={sectores.filter((s) => s.activo).map((s) => ({ id: s.id, nombre: s.nombre }))} agentes={agentes} esAdmin={esAdmin} />
           <table className="tabla">
             <thead>
               <tr>
+                <th className="w-8"><span className="sr-only">Seleccionar</span></th>
                 <th>N.º</th>
                 <th>Asunto</th>
                 <th>Prioridad</th>
@@ -155,6 +195,7 @@ export default async function Bandeja({
                 const respondido = t.primera_respuesta_en || t.resuelto_en
                 return (
                   <tr key={t.id}>
+                    <td><input type="checkbox" name="ids" value={t.id} aria-label={`Seleccionar el ticket ${t.numero}`} className="accent-brand-600" /></td>
                     <td className="text-ink/50">#{t.numero}</td>
                     <td className="max-w-sm">
                       <Link href={`/tickets/${t.id}`} className="block truncate font-medium hover:text-brand-600 hover:underline">{t.asunto}</Link>
@@ -183,7 +224,7 @@ export default async function Bandeja({
               })}
             </tbody>
           </table>
-        </div>
+        </form>
       )}
     </div>
   )

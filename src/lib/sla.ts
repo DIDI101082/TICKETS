@@ -2,7 +2,9 @@ import 'server-only'
 import { admin } from './supabase/admin'
 import { avisarTeams, enviarEmail } from './avisos'
 import { crearTicket, registrarEvento } from './tickets'
-import { guardarConfig, leerConfig, leerOpciones } from './config'
+import { guardarConfig, leerConfig, leerMantenimiento, leerOpciones, leerReporte } from './config'
+import { responsableDe } from './asignacion'
+import { avisarInteresados } from './notificar'
 import { APP_URL, slaRespuesta, slaResolucion } from './formato'
 import { etiquetaPrioridad, type Ticket } from './tipos'
 import { indicadores } from './metricas'
@@ -32,12 +34,12 @@ export async function revisar() {
   const limite = new Date(ahora + ANTICIPO * 60000).toISOString()
   const { data: sectores } = await db.from('sectores').select('id,nombre,responsable_id')
   const sector = new Map((sectores ?? []).map((s) => [s.id as string, s]))
-  const resultado = { avisos: 0, escalados: 0, programados: 0, resumenes: 0 }
+  const resultado = { avisos: 0, escalados: 0, programados: 0, resumenes: 0, cerrados: 0, recordatorios: 0, adjuntosBorrados: 0 }
 
   // 1. Avisos de SLA por vencer o vencido
   const [resp, resol] = await Promise.all([
-    db.from('tickets').select('*').in('estado', ['abierto', 'en_curso']).is('primera_respuesta_en', null).eq('alerta_respuesta', false).lt('vence_respuesta', limite).limit(50),
-    db.from('tickets').select('*').in('estado', ['abierto', 'en_curso']).eq('alerta_resolucion', false).lt('vence_resolucion', limite).limit(50),
+    db.from('tickets').select('*').in('estado', ['abierto', 'en_curso']).is('eliminado_en', null).is('primera_respuesta_en', null).eq('alerta_respuesta', false).lt('vence_respuesta', limite).limit(50),
+    db.from('tickets').select('*').in('estado', ['abierto', 'en_curso']).is('eliminado_en', null).eq('alerta_resolucion', false).lt('vence_resolucion', limite).limit(50),
   ])
   const avisar = async (t: Ticket, tipo: 'respuesta' | 'resolucion') => {
     const sla = tipo === 'respuesta' ? slaRespuesta(t) : slaResolucion(t)
@@ -63,11 +65,11 @@ export async function revisar() {
   if (op.escalar_sin_tomar_min > 0) {
     filtros.push(`and(asignado_id.is.null,creado_en.lt."${new Date(ahora - op.escalar_sin_tomar_min * 60000).toISOString()}")`)
   }
-  const { data: aEscalar } = await db.from('tickets').select('*').in('estado', ['abierto', 'en_curso']).is('escalado_en', null).or(filtros.join(',')).limit(50)
+  const { data: aEscalar } = await db.from('tickets').select('*').in('estado', ['abierto', 'en_curso']).is('eliminado_en', null).is('escalado_en', null).or(filtros.join(',')).limit(50)
 
   for (const t of (aEscalar ?? []) as Ticket[]) {
     const s = t.sector_id ? sector.get(t.sector_id) : null
-    const responsableId = (s?.responsable_id as string | null) ?? null
+    const responsableId = await responsableDe(t.sector_id, (s?.responsable_id as string | null) ?? null)
     const vencido =
       (t.vence_resolucion && new Date(t.vence_resolucion).getTime() < ahora) ||
       (!t.primera_respuesta_en && t.vence_respuesta && new Date(t.vence_respuesta).getTime() < ahora)
@@ -124,7 +126,41 @@ export async function revisar() {
   if (hecho.mes !== mesActual) {
     await guardarConfig('ultimo_resumen', { mes: mesActual })
     // La primera vez solo se deja registrado el mes, para no mandar un resumen al instalar.
-    if (hecho.mes) resultado.resumenes = await enviarResumenes(mesActual)
+    if (hecho.mes) resultado.resumenes = (await enviarResumenes(mesActual)) + (await enviarReporteGeneral(mesActual))
+  }
+
+  // 5. Mantenimiento: cierre automático, recordatorios y retención de adjuntos
+  const mant = await leerMantenimiento()
+  if (mant.cerrar_resueltos_dias > 0) {
+    const corte = new Date(ahora - mant.cerrar_resueltos_dias * 86400000).toISOString()
+    const { data: viejos } = await db.from('tickets').select('id').eq('estado', 'resuelto').is('eliminado_en', null).lt('resuelto_en', corte).limit(200)
+    for (const v of viejos ?? []) {
+      await db.from('tickets').update({ estado: 'cerrado' }).eq('id', v.id).eq('estado', 'resuelto')
+      await registrarEvento(v.id, 'Sistema', `Cerrado automáticamente: ${mant.cerrar_resueltos_dias} días resuelto sin novedades`)
+      resultado.cerrados++
+    }
+  }
+  if (mant.recordar_espera_dias > 0) {
+    const corte = new Date(ahora - mant.recordar_espera_dias * 86400000).toISOString()
+    const { data: quietos } = await db.from('tickets').select('*').eq('estado', 'en_espera').neq('aprobacion_estado', 'pendiente').is('recordatorio_en', null).is('eliminado_en', null).lt('en_espera_desde', corte).limit(100)
+    for (const t of (quietos ?? []) as Ticket[]) {
+      await db.from('tickets').update({ recordatorio_en: iso }).eq('id', t.id)
+      await avisarInteresados(t, { tipo: 'respuesta', titulo: 'Seguimos esperando tu respuesta', texto: `El pedido #${t.numero} está frenado esperando una respuesta tuya. Si ya no lo necesitás, podés cerrarlo desde el mismo enlace.` })
+      resultado.recordatorios++
+    }
+  }
+  if (mant.borrar_adjuntos_meses > 0) {
+    const corte = new Date(ahora - mant.borrar_adjuntos_meses * 30 * 86400000).toISOString()
+    const { data: cerrados } = await db.from('tickets').select('id').in('estado', ['resuelto', 'cerrado']).lt('resuelto_en', corte).limit(500)
+    const ids = (cerrados ?? []).map((c) => c.id)
+    if (ids.length) {
+      const { data: adj } = await db.from('adjuntos').select('id,ruta').in('ticket_id', ids).limit(200)
+      if (adj?.length) {
+        await db.storage.from('adjuntos').remove(adj.map((a) => a.ruta))
+        await db.from('adjuntos').delete().in('id', adj.map((a) => a.id))
+        resultado.adjuntosBorrados = adj.length
+      }
+    }
   }
 
   return resultado
@@ -181,4 +217,38 @@ export async function revisarSiToca() {
   } catch (e) {
     console.error('Revisión periódica falló:', e)
   }
+}
+
+/** Reporte mensual general, para los destinatarios definidos en Administración → Integraciones. */
+async function enviarReporteGeneral(mesActual: string) {
+  const { destinatarios } = await leerReporte()
+  const mails = destinatarios.split(/[,;\s]+/).filter((m) => m.includes('@')).slice(0, 20)
+  if (!mails.length) return 0
+  const db = admin()
+  const [a, m] = mesActual.split('-').map(Number)
+  const inicio = new Date(Date.UTC(a, m - 2, 1, 3)).toISOString()
+  const fin = new Date(Date.UTC(a, m - 1, 1, 3)).toISOString()
+  const nombreMes = new Intl.DateTimeFormat('es-AR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(a, m - 2, 15)))
+  const [{ data }, { data: sectores }] = await Promise.all([
+    db.from('tickets').select('*').is('fusionado_en_id', null).is('eliminado_en', null).gte('creado_en', inicio).lt('creado_en', fin).limit(10000),
+    db.from('sectores').select('id,nombre').order('orden'),
+  ])
+  const tickets = (data ?? []) as Ticket[]
+  const linea = (i: ReturnType<typeof indicadores>) =>
+    `${i.etiqueta}: ${i.creados} creados, ${i.resueltos} resueltos, SLA de resolución ${i.slaResol}, tiempo medio ${i.tiempoResol == null ? 'sin datos' : duracion(i.tiempoResol)}, satisfacción ${i.csat == null ? 'sin encuestas' : i.csat.toFixed(1)}`
+  const horas = Math.round(tickets.reduce((n, t) => n + (t.minutos_trabajados ?? 0), 0) / 60)
+  const texto = [
+    `Reporte de ${nombreMes}`,
+    '',
+    linea(indicadores('Total', tickets)),
+    `Horas trabajadas registradas: ${horas}`,
+    '',
+    'Por sector:',
+    ...(sectores ?? []).map((s) => indicadores(s.nombre, tickets.filter((t) => t.sector_id === s.id))).filter((i) => i.creados > 0).map((i) => `- ${linea(i)}`),
+    '',
+    `Detalle completo: ${APP_URL}/tablero/reportes`,
+  ].join('\n')
+  let enviados = 0
+  for (const mail of mails) if (await enviarEmail(mail, `Reporte de la mesa de ayuda: ${nombreMes}`, texto)) enviados++
+  return enviados
 }

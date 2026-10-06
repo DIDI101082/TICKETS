@@ -23,6 +23,18 @@ Sistema de tickets para usuarios internos y clientes externos. Next.js + Supabas
 - Estado de los servicios y voto "¿te sirvió?" en cada artículo.
 - Resumen mensual por mail para el referente de cada organización.
 
+**Para quienes atienden y administran**
+- Bandeja con acciones en lote, vistas guardadas y filtro por agente; aviso cuando otro agente tiene abierto o está respondiendo el mismo ticket.
+- Respuestas predefinidas que además cambian el estado (macros), menciones con @ en notas internas y registro de tiempo trabajado.
+- Carga de tickets en nombre de otra persona (teléfono o en persona).
+- Reparto automático por sector (por turno o por carga), guardias y ausencias.
+- Reglas automáticas (si… entonces…), tiempos de SLA especiales por organización o categoría.
+- Aprobadores por defecto por categoría, con el jefe del solicitante primero y aprobación en varios pasos.
+- Cierre automático de resueltos, recordatorio al usuario en espera y retención de adjuntos.
+- Alta de cuentas desde la app (de a una o en lote), desactivación y borrado de datos personales.
+- "Ver como usuario", rol de supervisor, pantalla de integraciones con pruebas reales y textos de los mails.
+- Calidad de la derivación por IA en los reportes, reporte mensual por mail, papelera e importación de historial.
+
 **IA** (requiere `ANTHROPIC_API_KEY`)
 - Derivación automática a sector y prioridad; con poca confianza el ticket queda en Triage.
 - Borrador de respuesta a partir del hilo y de los artículos de ayuda. El agente siempre lo revisa: nunca se envía solo.
@@ -53,7 +65,7 @@ Sistema de tickets para usuarios internos y clientes externos. Next.js + Supabas
 ### 1. Supabase
 
 1. Crear un proyecto.
-2. **SQL Editor** → ejecutar, en este orden: `supabase/schema.sql`, `002_ampliacion.sql`, `003_formularios.sql` (formularios de pedidos frecuentes, opcional) y `004_portal.sql`. Todos se pueden correr más de una vez.
+2. **SQL Editor** → ejecutar, en este orden: `supabase/schema.sql`, `002_ampliacion.sql`, `003_formularios.sql` (formularios de pedidos frecuentes, opcional), `004_portal.sql` y `005_administracion.sql`. Todos se pueden correr más de una vez.
 3. **Authentication → URL Configuration**: *Site URL* con la dirección de la app y `https://TU-APP/auth/callback` en *Redirect URLs*.
 4. (Opcional) **Authentication → Providers → Azure** para el ingreso con Microsoft, y `NEXT_PUBLIC_MICROSOFT=1` en Vercel.
 
@@ -136,6 +148,12 @@ Devuelve abiertos, en curso, en espera, sin asignar, en triage, SLA vencido, ant
 - Los avisos a Teams no muestran el asunto de los tickets confidenciales.
 
 ## Límites conocidos
+
+- Las cuentas creadas desde la app nacen con una clave temporal que se muestra una sola vez; no hay todavía un cambio de clave obligatorio en el primer ingreso.
+- "Ver como usuario" cambia las pantallas, no los permisos: abriendo la dirección de un ticket ajeno se sigue viendo.
+- El aviso de colisión se actualiza cada 20 segundos, no al instante.
+- Las reglas automáticas se aplican al crear el ticket, no cuando se modifica después.
+- La importación no detecta duplicados.
 
 - El borrador del formulario vive en el navegador: no pasa de una computadora a otra y no guarda los adjuntos.
 - "Pedir para otro" y "en copia" solo vinculan a personas que ya tienen cuenta.

@@ -35,6 +35,13 @@ export default async function Cuenta({ searchParams }: { searchParams: Promise<{
           ))}
           <p className="text-xs text-ink/45">Los pedidos de aprobación te llegan siempre por mail, porque necesitan tu decisión.</p>
         </fieldset>
+        {perfil.rol !== 'usuario' && (
+          <div>
+            <label className="rotulo" htmlFor="ausente_hasta">Estoy ausente hasta</label>
+            <input id="ausente_hasta" name="ausente_hasta" type="date" defaultValue={perfil.ausente_hasta ?? ''} className="campo w-auto" />
+            <p className="mt-1 text-xs text-ink/45">Mientras tanto no recibís tickets por reparto automático. Dejalo vacío cuando vuelvas.</p>
+          </div>
+        )}
         <button className="btn">Guardar</button>
       </form>
     </div>

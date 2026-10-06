@@ -5,13 +5,13 @@ import { sesion } from '@/lib/auth'
 import { admin } from '@/lib/supabase/admin'
 import { asistir } from '@/lib/ia'
 import { claves, coincidencias } from '@/lib/texto'
-import { archivosDe, crearTicket, subirAdjuntos } from '@/lib/tickets'
+import { archivosDe, crearTicket, registrarEvento, subirAdjuntos } from '@/lib/tickets'
 import { IMPACTOS, URGENCIAS, type Categoria, type Dato } from '@/lib/tipos'
 
 const mails = (texto: string) => [...new Set(texto.toLowerCase().match(/[^\s,;<>"]+@[^\s,;<>"]+\.[^\s,;<>"]+/g) ?? [])].slice(0, 10)
 
 export async function crear(form: FormData) {
-  const { db, perfil } = await sesion()
+  const { db, perfil, staff } = await sesion()
   const asunto = String(form.get('asunto') || '').trim()
   const descripcion = String(form.get('descripcion') || '').trim()
   if (!asunto || !descripcion) redirect('/portal/nuevo')
@@ -39,21 +39,31 @@ export async function crear(form: FormData) {
   const porMail = new Map((encontrados ?? []).map((p) => [String(p.email).toLowerCase(), p]))
   const beneficiario = porMail.get(mails(paraQuien)[0] ?? '')
 
+  // Solo el equipo puede cargar un ticket a nombre de otra persona (lo que entra por teléfono o en persona).
+  const otroMail = staff ? String(form.get('solicitante_email') || '').trim().toLowerCase() : ''
+  let solicitante = { id: perfil.id as string | null, email: perfil.email, nombre: perfil.nombre }
+  if (otroMail && otroMail !== perfil.email.toLowerCase()) {
+    const { data: otro } = await admin().from('perfiles').select('id,nombre,email').ilike('email', otroMail).maybeSingle()
+    solicitante = otro ? { id: otro.id, email: otro.email, nombre: otro.nombre } : { id: null, email: otroMail, nombre: String(form.get('solicitante_nombre') || '').trim().slice(0, 80) || otroMail.split('@')[0] }
+  }
+  const enNombre = solicitante.id !== perfil.id
+
   const t = await crearTicket({
     asunto,
     descripcion,
-    canal: 'portal',
-    solicitanteId: perfil.id,
-    email: perfil.email,
-    nombre: perfil.nombre,
+    canal: enNombre ? 'telefono' : 'portal',
+    solicitanteId: solicitante.id,
+    email: solicitante.email,
+    nombre: solicitante.nombre,
     categoriaId,
     datos,
     impacto: IMPACTOS.some((x) => x.valor === impacto) ? impacto : '',
     urgencia: URGENCIAS.some((x) => x.valor === urgencia) ? urgencia : '',
-    beneficiarioId: beneficiario && beneficiario.id !== perfil.id ? beneficiario.id : null,
+    beneficiarioId: beneficiario && beneficiario.id !== solicitante.id ? beneficiario.id : null,
     beneficiarioNombre: beneficiario ? beneficiario.nombre || beneficiario.email : paraQuien,
     seguidores: enCopia.map((m) => porMail.get(m)?.id).filter((x): x is string => !!x && x !== perfil.id),
   })
+  if (enNombre) await registrarEvento(t.id, perfil.nombre, `Cargado por ${perfil.nombre || perfil.email} en nombre de ${solicitante.nombre || solicitante.email}`)
   await subirAdjuntos(t.id, null, archivosDe(form))
   redirect(`/tickets/${t.id}`)
 }

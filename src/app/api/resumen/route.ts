@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   const db = admin()
   const [{ data: tickets }, { data: sectores }] = await Promise.all([
-    db.from('tickets').select('estado,sector_id,creado_en,vence_resolucion,vence_respuesta,primera_respuesta_en,asignado_id').in('estado', ['abierto', 'en_curso', 'en_espera']).limit(10000),
+    db.from('tickets').select('estado,sector_id,creado_en,vence_resolucion,vence_respuesta,primera_respuesta_en,asignado_id').in('estado', ['abierto', 'en_curso', 'en_espera']).is('eliminado_en', null).limit(10000),
     db.from('sectores').select('id,nombre').order('orden'),
   ])
   const lista = tickets ?? []

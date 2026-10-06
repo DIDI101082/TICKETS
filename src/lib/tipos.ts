@@ -1,7 +1,7 @@
 export type Rol = 'admin' | 'agente' | 'usuario'
 export type Estado = 'abierto' | 'en_curso' | 'en_espera' | 'resuelto' | 'cerrado'
 export type Prioridad = 'baja' | 'media' | 'alta' | 'urgente'
-export type Canal = 'portal' | 'email' | 'teams' | 'monitoreo' | 'programado'
+export type Canal = 'portal' | 'email' | 'teams' | 'monitoreo' | 'programado' | 'telefono' | 'importado'
 export type Aprobacion = 'no_requiere' | 'pendiente' | 'aprobado' | 'rechazado'
 
 export const ESTADOS: { valor: Estado; etiqueta: string }[] = [
@@ -34,6 +34,10 @@ export interface Perfil {
   organizacion_id: string | null
   ve_organizacion: boolean
   avisos_mail: 'todo' | 'resuelto' | 'nada'
+  activo: boolean
+  supervisor: boolean
+  ausente_hasta: string | null
+  jefe_id: string | null
 }
 
 export interface Sector {
@@ -43,6 +47,7 @@ export interface Sector {
   activo: boolean
   orden: number
   responsable_id: string | null
+  asignacion: 'manual' | 'turno' | 'carga'
 }
 
 export interface Organizacion {
@@ -70,6 +75,8 @@ export interface Categoria {
   confidencial: boolean
   activo: boolean
   orden: number
+  aprobadores: string[]
+  aprobador_jefe: boolean
 }
 
 export interface Dato {
@@ -123,6 +130,9 @@ export interface Ticket {
   urgencia: string
   beneficiario_id: string | null
   beneficiario_nombre: string
+  eliminado_en: string | null
+  minutos_trabajados: number
+  aprobadores_pendientes: string[]
 }
 
 export interface Mensaje {
@@ -202,3 +212,11 @@ export interface Servicio {
   orden: number
   actualizado_en: string
 }
+
+export interface Mantenimiento {
+  cerrar_resueltos_dias: number
+  recordar_espera_dias: number
+  borrar_adjuntos_meses: number
+  tablero_solo_supervisores: boolean
+}
+export const MANTENIMIENTO_INICIAL: Mantenimiento = { cerrar_resueltos_dias: 7, recordar_espera_dias: 3, borrar_adjuntos_meses: 0, tablero_solo_supervisores: false }

@@ -3,9 +3,10 @@ import { sesion } from '@/lib/auth'
 import type { Categoria, Servicio, Ticket } from '@/lib/tipos'
 import Formulario, { type Inicial } from './formulario'
 
-export default async function Nuevo({ searchParams }: { searchParams: Promise<{ cat?: string; desde?: string }> }) {
+export default async function Nuevo({ searchParams }: { searchParams: Promise<{ cat?: string; desde?: string; para?: string }> }) {
   const sp = await searchParams
-  const { db } = await sesion()
+  const { db, staff } = await sesion()
+  const enNombre = staff && sp.para === 'otro'
   const [rc, rs] = await Promise.all([
     db.from('categorias').select('*').eq('activo', true).order('orden').order('nombre'),
     db.from('servicios').select('*').neq('estado', 'operativo').order('orden'),
@@ -33,7 +34,7 @@ export default async function Nuevo({ searchParams }: { searchParams: Promise<{ 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <div>
-        <h1>Nuevo ticket</h1>
+        <h1>{enNombre ? 'Nuevo ticket para otra persona' : 'Nuevo ticket'}</h1>
         <p className="text-sm text-ink/60">Elegí el tipo de pedido y describí el problema con el mayor detalle posible.</p>
       </div>
       {conProblemas.length > 0 && (
@@ -41,7 +42,7 @@ export default async function Nuevo({ searchParams }: { searchParams: Promise<{ 
           <strong>Ya estamos al tanto de un problema en:</strong> {conProblemas.map((s) => s.nombre).join(', ')}. Si tu pedido es por eso, no hace falta cargarlo. Ver el estado →
         </Link>
       )}
-      <Formulario categorias={categorias} inicial={inicial} />
+      <Formulario categorias={categorias} inicial={inicial} enNombre={enNombre} />
     </div>
   )
 }

@@ -8,7 +8,7 @@ import { APP_URL } from './formato'
 import type { Ticket } from './tipos'
 
 /** Deja el ticket esperando la decisión de una persona y le avisa, con enlaces para decidir desde el mail. */
-export async function solicitarAprobacion(t: Ticket, aprobador: { id: string; nombre: string; email: string }, pidio: string) {
+export async function solicitarAprobacion(t: Ticket, aprobador: { id: string; nombre: string; email: string }, pidio: string, siguientes: string[] = []) {
   const token = randomBytes(24).toString('base64url')
   await admin()
     .from('tickets')
@@ -18,6 +18,7 @@ export async function solicitarAprobacion(t: Ticket, aprobador: { id: string; no
       aprobacion_nota: '',
       aprobacion_en: null,
       aprobacion_token: token,
+      aprobadores_pendientes: siguientes,
       ...(t.estado !== 'en_espera' ? { estado: 'en_espera' } : {}),
     })
     .eq('id', t.id)
@@ -53,6 +54,16 @@ export async function registrarDecision(t: Ticket, decision: 'aprobado' | 'recha
   const hecho = decision === 'aprobado' ? 'Aprobó' : 'Rechazó'
   await registrarEvento(t.id, nombre, `${hecho} el pedido${nota ? `: ${nota}` : ''}`)
   await auditar(actor, `${hecho} pedido`, 'ticket', `#${t.numero}`, nota)
+
+  // Aprobación en varios pasos: si quedan aprobadores en la lista, el pedido pasa al siguiente.
+  const cola = t.aprobadores_pendientes ?? []
+  if (decision === 'aprobado' && cola.length) {
+    const { data: prox } = await admin().from('perfiles').select('id,nombre,email').eq('id', cola[0]).eq('activo', true).maybeSingle()
+    if (prox) {
+      await solicitarAprobacion({ ...t, estado: 'en_curso' }, prox, 'Sistema', cola.slice(1))
+      return true
+    }
+  }
   await avisarInteresados(t, {
     tipo: 'otro',
     titulo: decision === 'aprobado' ? 'Tu pedido fue aprobado' : 'Tu pedido fue rechazado',

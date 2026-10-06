@@ -56,6 +56,21 @@ export async function responder(ticketId: string, form: FormData) {
   if (error || !m) throw new Error(`No se pudo guardar la respuesta: ${error?.message}`)
   await subirAdjuntos(ticketId, m.id, archivos)
 
+  // Menciones en notas internas: @nombre o @mail avisa a ese compañero.
+  if (interno && cuerpo.includes('@')) {
+    const { data: equipo } = await db.from('perfiles').select('id,nombre,email').in('rol', ['admin', 'agente']).eq('activo', true)
+    const texto = cuerpo.toLowerCase()
+    const mencionados = (equipo ?? []).filter((p) => {
+      if (p.id === perfil.id) return false
+      const nombre = String(p.nombre || '').toLowerCase()
+      const usuario = String(p.email).toLowerCase().split('@')[0]
+      return (nombre && texto.includes(`@${nombre}`)) || (nombre && texto.includes(`@${nombre.split(' ')[0]}`)) || texto.includes(`@${usuario}`)
+    })
+    for (const p of mencionados) {
+      await avisarPersona({ perfilId: p.id, ticket: t, tipo: 'otro', titulo: `${perfil.nombre} te mencionó`, texto: `${perfil.nombre} te mencionó en una nota interna del pedido #${t.numero}:\n\n${cuerpo}` })
+    }
+  }
+
   if (staff && !interno) {
     const pedido = String(form.get('estado_tras') || '')
     const cambios: Record<string, string> = {}

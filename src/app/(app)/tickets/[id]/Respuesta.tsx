@@ -22,7 +22,7 @@ export default function Respuesta({
 }: {
   ticketId: string
   staff: boolean
-  plantillas: { id: string; titulo: string; cuerpo: string }[]
+  plantillas: { id: string; titulo: string; cuerpo: string; estado_tras: string; nota_interna: boolean }[]
   ia: boolean
 }) {
   const [texto, setTexto] = useState('')
@@ -30,6 +30,8 @@ export default function Respuesta({
   const [pensando, iniciar] = useTransition()
   const archivos = useRef<HTMLInputElement>(null)
   const [pegados, setPegados] = useState(0)
+  const [tras, setTras] = useState('')
+  const [interno, setInterno] = useState(false)
 
   function pedirBorrador() {
     setAviso('')
@@ -55,7 +57,11 @@ export default function Respuesta({
                 aria-label="Insertar respuesta predefinida"
                 onChange={(e) => {
                   const p = plantillas.find((x) => x.id === e.target.value)
-                  if (p) setTexto((t) => (t ? `${t}\n\n${p.cuerpo}` : p.cuerpo))
+                  if (!p) return
+                  setTexto((t) => (t ? `${t}\n\n${p.cuerpo}` : p.cuerpo))
+                  // Una respuesta predefinida puede traer además qué hacer con el ticket (macro).
+                  if (p.estado_tras) setTras(p.estado_tras)
+                  if (p.nota_interna) setInterno(true)
                 }}
               >
                 <option value="">Respuesta predefinida…</option>
@@ -88,11 +94,11 @@ export default function Respuesta({
         {staff && (
           <>
             <label className="flex items-center gap-1.5 text-sm">
-              <input type="checkbox" name="interno" className="accent-brand-600" /> Nota interna (no la ve el solicitante)
+              <input type="checkbox" name="interno" checked={interno} onChange={(e) => setInterno(e.target.checked)} className="accent-brand-600" /> Nota interna (no la ve el solicitante; con @nombre avisás a un compañero)
             </label>
             <label className="flex items-center gap-1.5 text-sm">
               Después de enviar:
-              <select name="estado_tras" className="campo w-auto py-1" defaultValue="">
+              <select name="estado_tras" className="campo w-auto py-1" value={tras} onChange={(e) => setTras(e.target.value)}>
                 <option value="">dejar en curso</option>
                 <option value="en_espera">pasar a En espera</option>
                 <option value="resuelto">marcar Resuelto</option>

@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
   const ref = asunto.match(/\[#(\d+)\]/)
   if (ref) {
-    const { data: t } = await db.from('tickets').select('id,numero,estado,solicitante_email').eq('numero', Number(ref[1])).maybeSingle()
+    const { data: t } = await db.from('tickets').select('id,numero,estado,solicitante_email').eq('numero', Number(ref[1])).is('eliminado_en', null).maybeSingle()
     if (t && t.solicitante_email === email && t.estado !== 'cerrado') {
       const limpio = limpiarRespuesta(cuerpo) || cuerpo
       if (limpio) {
