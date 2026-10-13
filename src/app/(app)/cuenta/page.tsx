@@ -1,11 +1,17 @@
+import Link from 'next/link'
 import { sesion } from '@/lib/auth'
+import { fecha } from '@/lib/formato'
+import type { Acceso } from '@/lib/tipos'
 import { guardarCuenta } from '../acciones'
 
 const ROL: Record<string, string> = { admin: 'Administrador', agente: 'Agente', usuario: 'Usuario' }
 
 export default async function Cuenta({ searchParams }: { searchParams: Promise<{ ok?: string }> }) {
   const { ok } = await searchParams
-  const { perfil } = await sesion()
+  const { perfil, db } = await sesion()
+  // Accesos otorgados a esta persona (si todavía no se ejecutó 006_accesos_y_conocimiento.sql, la lista queda vacía)
+  const { data: racc } = await db.from('accesos').select('*').eq('persona_id', perfil.id).neq('estado', 'revocado').order('hasta', { ascending: true, nullsFirst: false })
+  const misAccesos = (racc ?? []) as Acceso[]
   return (
     <div className="mx-auto max-w-xl space-y-5">
       <div>
@@ -44,6 +50,26 @@ export default async function Cuenta({ searchParams }: { searchParams: Promise<{
         )}
         <button className="btn">Guardar</button>
       </form>
+
+      {misAccesos.length > 0 && (
+        <div className="tarjeta space-y-2 p-5 text-sm">
+          <h2>Mis accesos</h2>
+          <p className="text-ink/60">Accesos que se te otorgaron por un pedido. Te avisamos unos días antes de que venzan.</p>
+          <ul className="divide-y divide-line/[0.06]">
+            {misAccesos.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-2">
+                <span>
+                  {a.sistema}
+                  {a.ticket_id && <Link href={`/tickets/${a.ticket_id}`} className="ml-2 text-xs text-brand-600 hover:underline">ver pedido</Link>}
+                </span>
+                <span className="text-ink/60">
+                  {a.estado === 'revocacion_pendiente' ? 'Se está quitando' : a.hasta ? `Vence el ${fecha(a.hasta)}` : 'Sin fecha de fin'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

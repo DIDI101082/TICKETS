@@ -155,3 +155,45 @@ ${AVISO_DATOS}`
   const texto = await preguntar(sistema, usuario, 600, process.env.AI_MODEL_REDACCION)
   return texto && !texto.includes('SIN_RESPUESTA') ? texto : null
 }
+
+export interface BorradorArticulo {
+  titulo: string
+  categoria: string
+  contenido: string
+}
+
+/**
+ * Convierte un ticket resuelto en un artículo de la base de conocimiento.
+ * Devuelve null si la IA no está configurada, falla o el ticket no tiene una solución que se pueda reutilizar.
+ */
+export async function redactarArticulo(h: Hilo, categorias: string[]): Promise<BorradorArticulo | null> {
+  const sistema = `Convertís un ticket resuelto de una mesa de ayuda en un artículo de la base de conocimiento, para que otras personas resuelvan solas el mismo problema o el equipo lo resuelva más rápido.
+
+Reglas:
+- Usá solo lo que está en el ticket. No inventes pasos, sistemas, menús, direcciones ni plazos.
+- Generalizá: sacá nombres de personas, mails, teléfonos, números de ticket, contraseñas, claves, IPs y nombres de equipos puntuales. Si hace falta, escribí "tu usuario", "tu equipo", etc.
+- Las notas internas son contexto: podés usar la solución que describen, pero sin mencionar que vienen de una nota.
+- Español rioplatense, trato de "vos", frases cortas.
+- Formato del contenido (texto, sin HTML): secciones con "## ", pasos numerados "1. ", viñetas "- " y **negrita** solo para lo importante. Secciones: "## Cuándo pasa" (síntomas o mensaje de error), "## Cómo resolverlo" (pasos) y, si aplica, "## Si no se resuelve" (qué datos mandar al cargar un pedido).
+- El título describe el problema como lo diría quien lo sufre (ej.: "No puedo conectarme a la VPN desde casa").
+- Categoría: una de esta lista si alguna encaja; si no, una palabra o dos: ${categorias.length ? categorias.join(', ') : 'General'}.
+- Si el ticket no tiene una solución clara que se pueda reutilizar, respondé exactamente: SIN_SOLUCION
+
+${AVISO_DATOS}
+
+Respondé únicamente con un objeto JSON, sin texto adicional:
+{"titulo": "...", "categoria": "...", "contenido": "..."}`
+  const texto = await preguntar(sistema, hiloComoTexto(h), 1800, process.env.AI_MODEL_REDACCION)
+  if (!texto || texto.includes('SIN_SOLUCION')) return null
+  try {
+    const bloque = texto.match(/\{[\s\S]*\}/)
+    if (!bloque) return null
+    const d = JSON.parse(bloque[0])
+    const titulo = String(d.titulo ?? '').trim().slice(0, 200)
+    const contenido = String(d.contenido ?? '').trim().slice(0, 20000)
+    if (!titulo || !contenido) return null
+    return { titulo, categoria: String(d.categoria ?? 'General').trim().slice(0, 60) || 'General', contenido }
+  } catch {
+    return null
+  }
+}

@@ -4,8 +4,9 @@ import { exigirStaff } from '@/lib/auth'
 import type { Articulo } from '@/lib/tipos'
 import { eliminarArticulo, guardarArticulo } from '../../acciones'
 
-export default async function Editar({ params }: { params: Promise<{ id: string }> }) {
+export default async function Editar({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ desde?: string; ia?: string }> }) {
   const { id } = await params
+  const { desde, ia } = await searchParams
   const { db } = await exigirStaff()
   const nuevo = id === 'nuevo'
 
@@ -22,6 +23,13 @@ export default async function Editar({ params }: { params: Promise<{ id: string 
         ← Volver
       </Link>
       <h1>{nuevo ? 'Nuevo artículo' : 'Editar artículo'}</h1>
+      {a?.ticket_origen_id && !a.publicado && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">
+          Borrador {ia ? 'redactado con IA ' : ''}a partir del ticket{' '}
+          <Link href={`/tickets/${a.ticket_origen_id}`} className="font-medium underline">{desde ? `#${desde}` : 'de origen'}</Link>.
+          Revisá que los pasos sean correctos y que no queden nombres, mails ni datos de la persona antes de publicarlo.
+        </p>
+      )}
 
       <form action={guardarArticulo.bind(null, a?.id ?? null)} className="tarjeta space-y-4 p-5">
         <div>

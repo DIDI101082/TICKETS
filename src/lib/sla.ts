@@ -9,6 +9,7 @@ import { APP_URL, slaRespuesta, slaResolucion } from './formato'
 import { etiquetaPrioridad, type Ticket } from './tipos'
 import { indicadores } from './metricas'
 import { duracion } from './formato'
+import { revisarAccesos } from './accesos'
 
 // Minutos de anticipación con los que se avisa que un SLA está por vencer.
 const ANTICIPO = 30
@@ -34,7 +35,7 @@ export async function revisar() {
   const limite = new Date(ahora + ANTICIPO * 60000).toISOString()
   const { data: sectores } = await db.from('sectores').select('id,nombre,responsable_id')
   const sector = new Map((sectores ?? []).map((s) => [s.id as string, s]))
-  const resultado = { avisos: 0, escalados: 0, programados: 0, resumenes: 0, cerrados: 0, recordatorios: 0, adjuntosBorrados: 0 }
+  const resultado = { avisos: 0, escalados: 0, programados: 0, resumenes: 0, cerrados: 0, recordatorios: 0, adjuntosBorrados: 0, avisosAcceso: 0, revocaciones: 0, reconfirmaciones: 0 }
 
   // 1. Avisos de SLA por vencer o vencido
   const [resp, resol] = await Promise.all([
@@ -118,6 +119,14 @@ export async function revisar() {
       avisarSolicitante: false,
     })
     resultado.programados++
+  }
+
+  // 3 bis. Accesos otorgados: aviso de vencimiento, revocación y reconfirmación
+  try {
+    Object.assign(resultado, await revisarAccesos())
+  } catch (e) {
+    // Si todavía no se ejecutó 006_accesos_y_conocimiento.sql, el resto de la revisión sigue igual.
+    console.error('Revisión de accesos:', e)
   }
 
   // 4. Resumen mensual para el referente de cada organización (una vez por mes, sobre el mes anterior)

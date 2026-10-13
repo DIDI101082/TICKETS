@@ -3,7 +3,7 @@ import { admin } from './supabase/admin'
 import { avisarTeamsPersona, enviarEmail } from './avisos'
 import { APP_URL } from './formato'
 
-export type TipoAviso = 'respuesta' | 'resuelto' | 'aprobacion' | 'otro'
+export type TipoAviso = 'respuesta' | 'resuelto' | 'aprobacion' | 'acceso' | 'otro'
 
 interface TicketMinimo {
   id: string
@@ -13,7 +13,8 @@ interface TicketMinimo {
 
 /** ¿Corresponde mandar mail según lo que eligió la persona? Los pedidos de aprobación salen siempre. */
 function mailPermitido(preferencia: string, tipo: TipoAviso) {
-  if (tipo === 'aprobacion') return true
+  // Las aprobaciones y los vencimientos de accesos salen siempre: necesitan una decisión o avisan un corte.
+  if (tipo === 'aprobacion' || tipo === 'acceso') return true
   if (preferencia === 'nada') return false
   if (preferencia === 'resuelto') return tipo === 'resuelto'
   return true

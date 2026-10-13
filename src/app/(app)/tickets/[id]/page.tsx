@@ -5,14 +5,17 @@ import { admin } from '@/lib/supabase/admin'
 import { auditar } from '@/lib/auditoria'
 import { iaDisponible } from '@/lib/ia'
 import { claves, coincidencias, rellenar } from '@/lib/texto'
-import { fecha, slaRespuesta, slaResolucion, tamano } from '@/lib/formato'
+import { aInputFecha, fecha, slaRespuesta, slaResolucion, tamano } from '@/lib/formato'
 import { InsigniaEstado, InsigniaPrioridad, TextoSla } from '@/components/Insignias'
-import { ESTADOS, PRIORIDADES, etiquetaImpacto, etiquetaUrgencia, type Adjunto, type Mensaje, type Sector, type Ticket } from '@/lib/tipos'
+import { ESTADOS, PRIORIDADES, etiquetaImpacto, etiquetaUrgencia, type Acceso, type Adjunto, type Mensaje, type Sector, type Ticket } from '@/lib/tipos'
+import { cambiarVencimiento, quitarAhora } from '../../accesos/acciones'
+import { Suspense } from 'react'
+import ContextoCyber from './ContextoCyber'
 import Pasos from '@/components/Pasos'
 import Presencia from '@/components/Presencia'
 import { enviarAPapelera, registrarTiempo } from '../../acciones'
 import Respuesta from './Respuesta'
-import { agregarSeguidor, quitarSeguidor, reabrir, actualizar, calificar, cerrarPropio, decidirAprobacion, desvincular, fusionar, generarResumen, pedirAprobacion, tomar, vincular } from './acciones'
+import { agregarSeguidor, quitarSeguidor, reabrir, actualizar, articuloDesdeTicket, calificar, cerrarPropio, decidirAprobacion, desvincular, fusionar, generarResumen, pedirAprobacion, tomar, vincular } from './acciones'
 
 function Adjuntos({ lista }: { lista: Adjunto[] }) {
   if (!lista.length) return null
@@ -55,7 +58,7 @@ const APROBACION: Record<string, { texto: string; clase: string }> = {
 
 export default async function Detalle({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { db, perfil, staff, esAdmin } = await sesion()
+  const { db, perfil, staff, esAdmin, supervisor } = await sesion()
 
   const { data } = await db.from('tickets').select('*').eq('id', id).maybeSingle()
   if (!data) notFound()
@@ -122,6 +125,14 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
     cuerpo: rellenar(p.cuerpo, { nombre: (t.solicitante_nombre || '').split(' ')[0], numero: String(t.numero), asunto: t.asunto }),
   }))
   const cyber = (process.env.NEXT_PUBLIC_CYBER_URL || '').replace(/\/$/, '')
+  // Accesos: el que otorgó este pedido, o el que este ticket tiene que quitar (si ya se ejecutó 006_accesos_y_conocimiento.sql)
+  const { data: racc2 } = await db.from('accesos').select('*').or(`ticket_id.eq.${t.id},revocar_ticket_id.eq.${t.id}`)
+  const accesosTicket = (racc2 ?? []) as Acceso[]
+  const { data: rart } = staff ? await db.from('articulos').select('id,titulo,publicado').eq('ticket_origen_id', t.id).limit(1) : { data: [] }
+  const articulo = ((rart ?? []) as { id: string; titulo: string; publicado: boolean }[])[0]
+  // Para los datos de Accusys Cyber: la persona para quien es el pedido o, si no, quien lo pidió
+  const { data: benef } = staff && t.beneficiario_id ? await admin().from('perfiles').select('email').eq('id', t.beneficiario_id).maybeSingle() : { data: null }
+  const emailContexto = (benef?.email || t.solicitante_email || '').toLowerCase()
   const apr = APROBACION[t.aprobacion_estado]
 
   return (
@@ -166,6 +177,13 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
           {t.aprobacion_estado === 'pendiente' && !esAprobador && (
             <p className="text-sm text-ink/65">El pedido está esperando la aprobación de un responsable. Te avisamos apenas decida.</p>
           )}
+          {accesosTicket.filter((a) => a.ticket_id === t.id && a.estado === 'vigente').map((a) => (
+            <p key={a.id} className="rounded-lg bg-brand-50/70 px-3 py-2 text-sm text-ink/80">
+              {a.hasta
+                ? <>El acceso otorgado vence el <strong className="text-ink">{fecha(a.hasta)}</strong>. Te avisamos unos días antes; si lo seguís necesitando, cargá un pedido nuevo.</>
+                : <>El acceso otorgado no tiene fecha de fin. Cada tanto le consultamos al responsable si sigue haciendo falta.</>}
+            </p>
+          ))}
           {!terminado && !esperaAlUsuario && t.aprobacion_estado !== 'pendiente' && (
             <p className="text-sm text-ink/65">
               {!t.primera_respuesta_en && t.vence_respuesta
@@ -396,6 +414,12 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
               </form>
             )}
 
+            {emailContexto.includes('@') && (
+              <Suspense fallback={<div className="tarjeta p-4 text-sm text-ink/50">Buscando datos en Accusys Cyber…</div>}>
+                <ContextoCyber email={emailContexto} ticketNumero={t.numero} />
+              </Suspense>
+            )}
+
             <div className="tarjeta space-y-2 p-4 text-sm">
               <h2>SLA</h2>
               <div className="flex items-center justify-between gap-2">
@@ -428,6 +452,54 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
                 </form>
               )}
             </div>
+
+            {accesosTicket.map((a) => {
+              const quita = a.revocar_ticket_id === t.id
+              const volverA = `/tickets/${t.id}`
+              return (
+                <div key={a.id} className="tarjeta space-y-2 p-4 text-sm">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <h2>{quita ? 'Acceso a quitar' : 'Acceso otorgado'}</h2>
+                    <Link href="/accesos" className="text-xs text-brand-600 hover:underline">Ver todos</Link>
+                  </div>
+                  <p>{a.sistema}</p>
+                  <p className="text-ink/60">{a.persona_nombre || a.persona_email}{a.persona_nombre && a.persona_email ? ` · ${a.persona_email}` : ''}</p>
+                  <p>
+                    {a.estado === 'revocado' ? (
+                      <span className="pill bg-ink/5 text-ink/60">Quitado el {fecha(a.revocado_en)}</span>
+                    ) : a.estado === 'revocacion_pendiente' ? (
+                      <span className="pill bg-orange-50 text-orange-700">{quita ? 'Al resolver este ticket queda registrado como quitado' : 'Hay un ticket abierto para quitarlo'}</span>
+                    ) : a.hasta ? (
+                      <span className={`pill ${new Date(a.hasta).getTime() < Date.now() ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>Vence el {fecha(a.hasta)}{a.fecha_estimada ? ' (estimada)' : ''}</span>
+                    ) : (
+                      <span className="pill bg-amber-500/10 text-amber-700">Sin fecha de fin: se reconfirma periódicamente</span>
+                    )}
+                  </p>
+                  {a.estado === 'vigente' && (
+                    <details>
+                      <summary className="cursor-pointer text-xs text-brand-600">Cambiar fecha o quitar</summary>
+                      <div className="mt-2 space-y-3">
+                        {supervisor && (
+                          <form action={cambiarVencimiento.bind(null, a.id)} className="space-y-1.5">
+                            <input type="hidden" name="volver" value={volverA} />
+                            <input name="hasta" type="datetime-local" defaultValue={aInputFecha(a.hasta)} className="campo" aria-label="Fecha de vencimiento" />
+                            <label className="flex items-center gap-2 text-xs">
+                              <input type="checkbox" name="sin_fecha" defaultChecked={!a.hasta} className="accent-brand-600" /> Sin fecha de fin
+                            </label>
+                            <button className="btn-sec w-full">Guardar fecha</button>
+                          </form>
+                        )}
+                        <form action={quitarAhora.bind(null, a.id)} className="flex gap-2">
+                          <input type="hidden" name="volver" value={volverA} />
+                          <input name="motivo" placeholder="Motivo (opcional)" className="campo" />
+                          <button className="btn-sec shrink-0 px-3 text-red-700">Quitar</button>
+                        </form>
+                      </div>
+                    </details>
+                  )}
+                </div>
+              )
+            })}
 
             <div className="tarjeta space-y-2 p-4 text-sm">
               <h2>Personas en copia</h2>
@@ -469,6 +541,24 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
                 <p className="text-ink/60">{iaDisponible() ? 'Todavía no se generó.' : 'Requiere configurar la clave de IA.'}</p>
               )}
             </div>
+
+            {(articulo || (terminado && !t.confidencial)) && (
+              <div className="tarjeta space-y-2 p-4 text-sm">
+                <h2>Base de conocimiento</h2>
+                {articulo ? (
+                  <p>
+                    Se creó el artículo <Link href={`/kb/${articulo.id}`} className="font-medium text-brand-600 hover:underline">{articulo.titulo}</Link>
+                    {!articulo.publicado && <span className="text-ink/50"> (borrador)</span>}.
+                  </p>
+                ) : (
+                  <form action={articuloDesdeTicket.bind(null, t.id)} className="space-y-1.5">
+                    <p className="text-ink/60">Si la solución puede servirle a otros, convertila en un artículo de ayuda.</p>
+                    <button className="btn-sec w-full">{iaDisponible() ? 'Redactar artículo con IA' : 'Crear artículo desde este ticket'}</button>
+                    <p className="text-xs text-ink/45">Queda como borrador para revisar antes de publicar.</p>
+                  </form>
+                )}
+              </div>
+            )}
 
             <div className="tarjeta space-y-3 p-4 text-sm">
               <h2>Vínculos</h2>

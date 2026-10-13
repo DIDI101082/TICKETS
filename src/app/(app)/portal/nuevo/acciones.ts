@@ -7,6 +7,7 @@ import { asistir } from '@/lib/ia'
 import { claves, coincidencias } from '@/lib/texto'
 import { archivosDe, crearTicket, registrarEvento, subirAdjuntos } from '@/lib/tickets'
 import { IMPACTOS, URGENCIAS, type Categoria, type Dato } from '@/lib/tipos'
+import { campoFechaLegible } from '@/lib/formato'
 
 const mails = (texto: string) => [...new Set(texto.toLowerCase().match(/[^\s,;<>"]+@[^\s,;<>"]+\.[^\s,;<>"]+/g) ?? [])].slice(0, 10)
 
@@ -24,7 +25,10 @@ export async function crear(form: FormData) {
     const cat = data as Categoria | null
     if (!cat) redirect('/portal/nuevo')
     datos = (cat.campos ?? [])
-      .map((c, i) => ({ etiqueta: c.etiqueta, valor: String(form.get(`campo_${i}`) || '').trim().slice(0, 2000) }))
+      .map((c, i) => {
+        const valor = String(form.get(`campo_${i}`) || '').trim().slice(0, 2000)
+        return { etiqueta: c.etiqueta, valor: c.tipo === 'fecha' ? campoFechaLegible(valor) : valor }
+      })
       .filter((d) => d.valor)
   }
 

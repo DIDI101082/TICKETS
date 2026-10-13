@@ -59,7 +59,7 @@ export interface Organizacion {
 
 export interface Campo {
   etiqueta: string
-  tipo: 'texto' | 'parrafo' | 'lista'
+  tipo: 'texto' | 'parrafo' | 'lista' | 'fecha'
   opciones: string[]
   requerido: boolean
 }
@@ -77,6 +77,9 @@ export interface Categoria {
   orden: number
   aprobadores: string[]
   aprobador_jefe: boolean
+  es_acceso?: boolean
+  acceso_dias_max?: number | null
+  recertificar_dias?: number
 }
 
 export interface Dato {
@@ -162,6 +165,40 @@ export interface Articulo {
   publicado: boolean
   autor_nombre: string
   actualizado_en: string
+  ticket_origen_id?: string | null
+}
+
+export type EstadoAcceso = 'vigente' | 'revocacion_pendiente' | 'revocado'
+
+export interface Acceso {
+  id: string
+  ticket_id: string | null
+  categoria_id: string | null
+  sector_id: string | null
+  persona_nombre: string
+  persona_email: string
+  persona_id: string | null
+  sistema: string
+  otorgado_en: string
+  hasta: string | null
+  fecha_estimada: boolean
+  estado: EstadoAcceso
+  aviso_enviado_en: string | null
+  revocar_ticket_id: string | null
+  revocado_en: string | null
+  revocado_por: string
+  recertificado_en: string | null
+  recertificar_token: string | null
+  recertificar_pedido_en: string | null
+  responsable_id: string | null
+  notas: string
+  creado_en: string
+}
+
+/** Fecha en que se debe volver a confirmar un acceso sin fecha de fin. */
+export function proximaRecertificacion(a: Pick<Acceso, 'otorgado_en' | 'recertificado_en'>, dias: number) {
+  const base = new Date(a.recertificado_en ?? a.otorgado_en).getTime()
+  return new Date(base + dias * 86400000)
 }
 
 export interface Horario {

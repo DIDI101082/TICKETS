@@ -59,6 +59,7 @@ export default function Nav({
   const solapas: Solapa[] = staff
     ? [
         { href: '/agente', label: 'Bandeja', tambien: ['/tickets'] },
+        { href: '/accesos', label: 'Accesos' },
         ...(verTablero ? [{
           href: '/tablero',
           label: 'Tablero',

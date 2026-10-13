@@ -5,6 +5,7 @@ import { useFormStatus } from 'react-dom'
 import Link from 'next/link'
 import { IMPACTOS, URGENCIAS, type Categoria } from '@/lib/tipos'
 import { pegarImagenes } from '@/components/pegar'
+import { campoFechaInput } from '@/lib/formato'
 import { asistente, crear } from './acciones'
 
 export interface Inicial {
@@ -157,6 +158,8 @@ export default function Formulario({ categorias, inicial, enNombre = false }: { 
                   <option key={o} value={o}>{o}</option>
                 ))}
               </select>
+            ) : c.tipo === 'fecha' ? (
+              <input id={`campo_${i}`} name={`campo_${i}`} type="datetime-local" required={c.requerido} className="campo" value={campoFechaInput(valor)} onChange={(e) => alCambiar(e.target.value)} />
             ) : c.tipo === 'parrafo' ? (
               <textarea id={`campo_${i}`} name={`campo_${i}`} required={c.requerido} rows={3} className="campo" value={valor} onChange={(e) => alCambiar(e.target.value)} />
             ) : (

@@ -49,6 +49,19 @@ Sistema de tickets para usuarios internos y clientes externos. Next.js + Supabas
 - Tickets programados que se crean solos (diario, semanal, mensual).
 - Tickets parecidos ya resueltos e historial por equipo (n.º de inventario).
 
+**Accesos con vencimiento**
+- Las categorías que otorgan accesos (VPN fuera de horario, AWS, Azure DevOps, Sentry) registran solas el acceso al resolverse el pedido: persona, sistema y fecha de fin.
+- Aviso a la persona unos días antes del vencimiento; al vencer se abre un ticket para quitarlo, y al resolverlo el acceso queda como quitado.
+- Los accesos sin fecha de fin se reconfirman cada 90 días (configurable por categoría) con quien los aprobó, desde un enlace en el mail.
+- Pantalla "Accesos" con vigentes, por vencer, a reconfirmar y por quitar; cada persona ve los suyos en "Mi cuenta".
+- Campos de tipo fecha en los formularios (calendario).
+
+**Accusys Cyber en cada ticket** (opcional)
+- Ficha de quien pide: área y puesto, equipos asignados con el estado del agente (antivirus, cifrado, último reporte), detecciones de ESET, MFA, cuenta de AD (bloqueada o no) y de Microsoft 365, y licencias.
+
+**Base de conocimiento desde tickets**
+- En un ticket resuelto, "Redactar artículo con IA" arma un borrador sin datos personales y lo abre en el editor. Nunca se publica solo.
+
 **Clientes y control**
 - Organizaciones: los usuarios se agrupan por empresa (automático por dominio del mail). Un "referente" ve todos los tickets de su organización.
 - Restricción por sector (opcional) y tickets confidenciales con acceso por persona.
@@ -65,7 +78,7 @@ Sistema de tickets para usuarios internos y clientes externos. Next.js + Supabas
 ### 1. Supabase
 
 1. Crear un proyecto.
-2. **SQL Editor** → ejecutar, en este orden: `supabase/schema.sql`, `002_ampliacion.sql`, `003_formularios.sql` (formularios de pedidos frecuentes, opcional), `004_portal.sql` y `005_administracion.sql`. Todos se pueden correr más de una vez.
+2. **SQL Editor** → ejecutar, en este orden: `supabase/schema.sql`, `002_ampliacion.sql`, `003_formularios.sql` (formularios de pedidos frecuentes, opcional), `004_portal.sql`, `005_administracion.sql` y `006_accesos_y_conocimiento.sql`. Todos se pueden correr más de una vez.
 3. **Authentication → URL Configuration**: *Site URL* con la dirección de la app y `https://TU-APP/auth/callback` en *Redirect URLs*.
 4. (Opcional) **Authentication → Providers → Azure** para el ingreso con Microsoft, y `NEXT_PUBLIC_MICROSOFT=1` en Vercel.
 
@@ -76,6 +89,11 @@ Subir el contenido de esta carpeta a un repo, importarlo en Vercel y cargar las 
 ### 3. Primer ingreso
 
 **La primera cuenta que se registra queda como administrador.** El resto entra como usuario externo y se le cambia el rol en Administración → Personas.
+
+### Accusys Cyber (opcional)
+
+1. En el SQL Editor de **Accusys Cyber** ejecutar `tickets-contexto.sql` (está en el repo de Accusys Cyber) y después `select public.tickets_nuevo_token();`.
+2. En Vercel de esta app cargar `CYBER_SUPABASE_URL` y `CYBER_SUPABASE_ANON_KEY` (los de Accusys Cyber), `CYBER_CONTEXTO_TOKEN` (la clave del paso 1, como Secret) y `NEXT_PUBLIC_CYBER_URL`.
 
 ### Actualizar una instalación existente
 

@@ -8,7 +8,7 @@ import { archivosDe, avisarResuelto, registrarEvento, subirAdjuntos } from '@/li
 import { avisarInteresados, avisarPersona } from '@/lib/notificar'
 import { registrarDecision, solicitarAprobacion } from '@/lib/aprobaciones'
 import { auditar } from '@/lib/auditoria'
-import { redactarBorrador, resumir, type Hilo } from '@/lib/ia'
+import { redactarArticulo, redactarBorrador, resumir, type Hilo } from '@/lib/ia'
 import { claves, coincidencias } from '@/lib/texto'
 import { ESTADOS, PRIORIDADES, etiquetaEstado, etiquetaPrioridad, type Mensaje, type Ticket } from '@/lib/tipos'
 
@@ -362,4 +362,59 @@ export async function borradorIA(ticketId: string): Promise<{ texto?: string; er
 
   const texto = await redactarBorrador(await hilo(t), utiles, perfil.nombre || 'Mesa de Ayuda')
   return texto ? { texto } : { error: 'No se pudo generar el borrador. Revisá que la clave de IA esté configurada.' }
+}
+
+// ---------- Ticket resuelto → artículo de la base de conocimiento ----------
+
+/**
+ * Arma un borrador de artículo a partir de la conversación del ticket (con IA si está configurada)
+ * y abre el editor para revisarlo. Nunca se publica solo.
+ */
+export async function articuloDesdeTicket(ticketId: string) {
+  const { perfil, t } = await ticketStaff(ticketId)
+  // Los confidenciales no se convierten: pueden tener datos personales o de seguridad.
+  if (t.confidencial) volver(ticketId)
+  const db = admin()
+  const { data: ya } = await db.from('articulos').select('id').eq('ticket_origen_id', t.id).limit(1)
+  if (ya?.length) redirect(`/kb/editar/${ya[0].id}`)
+
+  const h = await hilo(t)
+  const { data: cats } = await db.from('articulos').select('categoria').limit(500)
+  const categorias = [...new Set((cats ?? []).map((c) => String(c.categoria)).filter(Boolean))].slice(0, 30)
+  const ia = await redactarArticulo(h, categorias)
+
+  // Sin IA (o sin una solución clara para la IA): plantilla con lo que dice el ticket, para completar a mano.
+  const ultimaRespuesta = [...h.mensajes].reverse().find((m) => m.deStaff && !m.interno)?.cuerpo ?? ''
+  const borrador = ia ?? {
+    titulo: t.asunto,
+    categoria: 'General',
+    contenido: [
+      '## Cuándo pasa',
+      '',
+      t.descripcion.slice(0, 3000),
+      '',
+      '## Cómo resolverlo',
+      '',
+      ultimaRespuesta ? ultimaRespuesta.slice(0, 3000) : '1. (Completar con los pasos que resolvieron el problema)',
+    ].join('\n'),
+  }
+
+  const { data, error } = await db
+    .from('articulos')
+    .insert({
+      titulo: borrador.titulo,
+      categoria: borrador.categoria,
+      contenido: borrador.contenido,
+      visibilidad: 'internos',
+      publicado: false,
+      autor_nombre: perfil.nombre,
+      ticket_origen_id: t.id,
+    })
+    .select('id')
+    .single()
+  if (error || !data) throw new Error(`No se pudo crear el artículo: ${error?.message}`)
+  await registrarEvento(t.id, perfil.nombre, `Creó el borrador de artículo "${borrador.titulo}"${ia ? ' (redactado con IA)' : ''}`)
+  await auditar(perfil, 'Creó artículo desde ticket', 'articulo', borrador.titulo, `#${t.numero}`)
+  revalidatePath('/kb')
+  redirect(`/kb/editar/${data.id}?desde=${t.numero}${ia ? '&ia=1' : ''}`)
 }

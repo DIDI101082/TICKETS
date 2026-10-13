@@ -45,8 +45,8 @@ function Formulario({ c, sectores, orden, mailDe }: { c?: Categoria; sectores: S
       </div>
       <div>
         <label className="rotulo">Campos del formulario</label>
-        <textarea name="campos" rows={4} defaultValue={c ? aTexto(c.campos) : ''} className="campo font-mono text-[13px]" placeholder={'Sistema o servicio | texto | | obligatorio\n¿A cuántos afecta? | lista | Solo a mí, A mi equipo | obligatorio\nDetalle | párrafo'} />
-        <p className="mt-1 text-xs text-ink/45">Un campo por línea: Etiqueta | tipo (texto, párrafo o lista) | opciones separadas por coma | obligatorio</p>
+        <textarea name="campos" rows={4} defaultValue={c ? aTexto(c.campos) : ''} className="campo font-mono text-[13px]" placeholder={'Sistema o servicio | texto | | obligatorio\n¿A cuántos afecta? | lista | Solo a mí, A mi equipo | obligatorio\nHasta cuándo | fecha\nDetalle | párrafo'} />
+        <p className="mt-1 text-xs text-ink/45">Un campo por línea: Etiqueta | tipo (texto, párrafo, lista o fecha) | opciones separadas por coma | obligatorio</p>
       </div>
       <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
         <div>
@@ -64,6 +64,19 @@ function Formulario({ c, sectores, orden, mailDe }: { c?: Categoria; sectores: S
         </label>
         <label className="flex items-center gap-1.5">
           <input type="checkbox" name="confidencial" defaultChecked={c?.confidencial} className="accent-brand-600" /> Confidencial
+        </label>
+        <label className="flex items-center gap-1.5" title="Al resolverse, el acceso queda registrado y se controla su vencimiento">
+          <input type="checkbox" name="es_acceso" defaultChecked={c?.es_acceso} className="accent-brand-600" /> Otorga un acceso
+        </label>
+        <label className="flex items-center gap-1.5" title="Se usa si el pedido no trae una fecha de fin válida. Vacío: sin límite">
+          Vence a los
+          <input name="acceso_dias_max" type="number" min={1} max={3650} defaultValue={c?.acceso_dias_max ?? ''} className="campo w-20 py-1" aria-label="Días hasta el vencimiento si no hay fecha" />
+          días
+        </label>
+        <label className="flex items-center gap-1.5" title="Para accesos sin fecha de fin: cada cuántos días se pregunta si siguen haciendo falta">
+          Reconfirmar cada
+          <input name="recertificar_dias" type="number" min={7} max={730} defaultValue={c?.recertificar_dias ?? 90} className="campo w-20 py-1" aria-label="Días entre reconfirmaciones" />
+          días
         </label>
         {c && (
           <label className="flex items-center gap-1.5">

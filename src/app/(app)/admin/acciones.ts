@@ -105,7 +105,7 @@ function leerCampos(crudo: string): Campo[] {
     .filter((p) => p[0])
     .slice(0, 12)
     .map((p) => {
-      const tipo = /^lista/i.test(p[1] ?? '') ? 'lista' : /^p[aá]rrafo/i.test(p[1] ?? '') ? 'parrafo' : 'texto'
+      const tipo = /^lista/i.test(p[1] ?? '') ? 'lista' : /^p[aá]rrafo/i.test(p[1] ?? '') ? 'parrafo' : /^fecha/i.test(p[1] ?? '') ? 'fecha' : 'texto'
       return {
         etiqueta: p[0].slice(0, 80),
         tipo,
@@ -130,6 +130,9 @@ export async function guardarCategoria(id: string | null, form: FormData) {
     activo: id ? form.get('activo') === 'on' : true,
     aprobador_jefe: form.get('aprobador_jefe') === 'on',
     aprobadores: [] as string[],
+    es_acceso: form.get('es_acceso') === 'on',
+    acceso_dias_max: form.get('acceso_dias_max') ? Math.min(3650, Math.max(1, entero(form.get('acceso_dias_max'), 30))) : null,
+    recertificar_dias: Math.min(730, Math.max(7, entero(form.get('recertificar_dias'), 90))),
   }
   if (!fila.nombre) return
   const db = admin()
