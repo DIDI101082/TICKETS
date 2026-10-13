@@ -193,6 +193,11 @@ export default async function Detalle({ params, searchParams }: { params: Promis
           {t.aprobacion_estado === 'pendiente' && !esAprobador && (
             <p className="text-sm text-ink/65">El pedido está esperando la aprobación de un responsable. Te avisamos apenas decida.</p>
           )}
+          {!terminado && esPropio && (
+            <p className="text-sm text-ink/65">
+              ¿Preferís que te atiendan en persona o por Teams? <Link href={`/turnos?ticket=${t.id}`} className="text-brand-600 hover:underline">Pedí un turno con el CAU</Link>.
+            </p>
+          )}
           {!terminado && rcat.data?.consejos && (
             <div className="rounded-lg bg-brand-50/70 px-3 py-2 text-sm text-ink/80">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-brand-700">Recomendaciones</p>

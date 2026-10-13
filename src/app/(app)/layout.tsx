@@ -1,14 +1,17 @@
 import { sesion } from '@/lib/auth'
+import { admin } from '@/lib/supabase/admin'
 import { leerMantenimiento } from '@/lib/config'
 import Nav, { type Aviso } from '@/components/Nav'
 import { alternarVista } from './acciones'
 
 export default async function Marco({ children }: { children: React.ReactNode }) {
   const { db, perfil, staff, supervisor, vistaPrevia } = await sesion()
-  const [lista, sinLeer, mant] = await Promise.all([
+  const [lista, sinLeer, mant, aCargo] = await Promise.all([
     db.from('notificaciones').select('id,ticket_id,texto,leida,creado_en').order('creado_en', { ascending: false }).limit(10),
     db.from('notificaciones').select('id', { count: 'exact', head: true }).eq('leida', false),
     staff ? leerMantenimiento() : Promise.resolve(null),
+    // ¿Tiene gente a cargo? Muestra "Mi equipo".
+    admin().from('perfiles').select('id', { count: 'exact', head: true }).eq('jefe_id', perfil.id).eq('activo', true),
   ])
   return (
     <div className="min-h-screen">
@@ -26,6 +29,7 @@ export default async function Marco({ children }: { children: React.ReactNode })
         verTablero={supervisor || !mant?.tablero_solo_supervisores}
         avisos={(lista.data ?? []) as Aviso[]}
         sinLeer={sinLeer.count ?? 0}
+        esJefe={(aCargo.count ?? 0) > 0}
       />
       <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
     </div>

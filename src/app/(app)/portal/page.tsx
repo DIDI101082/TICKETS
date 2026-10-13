@@ -5,7 +5,7 @@ import { fecha } from '@/lib/formato'
 import { InsigniaEstado } from '@/components/Insignias'
 import { ACTIVOS, ESTADOS, type Categoria, type Servicio, type Ticket } from '@/lib/tipos'
 
-export default async function Portal({ searchParams }: { searchParams: Promise<{ ver?: string; estado?: string; q?: string }> }) {
+export default async function Portal({ searchParams }: { searchParams: Promise<{ ver?: string; estado?: string; q?: string; ok?: string }> }) {
   const sp = await searchParams
   const { db, perfil } = await sesion()
 
@@ -64,6 +64,11 @@ export default async function Portal({ searchParams }: { searchParams: Promise<{
         <Link href="/mi-espacio" className="block rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <strong>Detectamos {detectados === 1 ? 'algo' : `${detectados} cosas`} en tus equipos.</strong> Mirá qué es y qué podés hacer →
         </Link>
+      )}
+      {sp.ok === 'solucionado' && (
+        <p role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <strong>¡Qué bueno que se solucionó!</strong> Si vuelve a pasar, cargá el pedido y lo vemos.
+        </p>
       )}
       {politicasPendientes > 0 && (
         <Link href="/politicas" className="block rounded-xl border border-brand-500 bg-brand-50 px-4 py-3 text-sm text-brand-700">

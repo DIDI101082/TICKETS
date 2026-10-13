@@ -8,6 +8,9 @@ import { claves, coincidencias } from '@/lib/texto'
 import { archivosDe, crearTicket, registrarEvento, subirAdjuntos } from '@/lib/tickets'
 import { IMPACTOS, URGENCIAS, type Categoria, type Dato } from '@/lib/tipos'
 import { campoFechaLegible } from '@/lib/formato'
+import { contextoDe, cyberConfigurado } from '@/lib/cyber'
+import { leerHorario } from '@/lib/config'
+import { diagnosticar, resumenDiagnostico, type Diagnostico, type Hallazgo, type TipoDiagnostico } from '@/lib/diagnostico'
 
 const mails = (texto: string) => [...new Set(texto.toLowerCase().match(/[^\s,;<>"]+@[^\s,;<>"]+\.[^\s,;<>"]+/g) ?? [])].slice(0, 10)
 
@@ -68,6 +71,15 @@ export async function crear(form: FormData) {
     seguidores: enCopia.map((m) => porMail.get(m)?.id).filter((x): x is string => !!x && x !== perfil.id),
   })
   if (enNombre) await registrarEvento(t.id, perfil.nombre, `Cargado por ${perfil.nombre || perfil.email} en nombre de ${solicitante.nombre || solicitante.email}`)
+  // Si antes vio el diagnóstico, se deja como nota interna para quien lo atienda.
+  const autoId = String(form.get('autoservicio_id') || '')
+  if (autoId && !enNombre) {
+    const { data: auto } = await admin().from('autoservicio').select('id,hallazgos').eq('id', autoId).eq('perfil_id', perfil.id).maybeSingle()
+    if (auto) {
+      await admin().from('autoservicio').update({ resultado: 'ticket', ticket_id: t.id, actualizado_en: new Date().toISOString() }).eq('id', auto.id)
+      await admin().from('mensajes').insert({ ticket_id: t.id, autor_id: null, autor_nombre: 'Diagnóstico automático', de_staff: true, interno: true, cuerpo: resumenDiagnostico(auto.hallazgos as Hallazgo[]) })
+    }
+  }
   await subirAdjuntos(t.id, null, archivosDe(form))
   redirect(`/tickets/${t.id}`)
 }
@@ -90,4 +102,47 @@ export async function asistente(asunto: string, descripcion: string): Promise<{ 
 
   const respuesta = await asistir(consulta, utiles)
   return { respuesta: respuesta ?? undefined, articulos: utiles.map(({ id, titulo }) => ({ id, titulo })) }
+}
+
+/** ¿Estamos fuera del horario laboral? (para el diagnóstico de VPN) */
+async function fueraDeHorario() {
+  const h = await leerHorario()
+  const partes = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', { timeZone: h.zona || 'America/Argentina/Buenos_Aires', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date())
+      .map((p) => [p.type, p.value]),
+  )
+  const dia = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(partes.weekday)
+  const hora = `${partes.hour}:${partes.minute}`
+  return !h.dias.includes(dia) || hora < h.desde || hora >= h.hasta
+}
+
+/** Revisa el equipo y la cuenta de la persona con los datos de Accusys Cyber, antes de que envíe el pedido. */
+export async function revisarAntes(categoriaId: string, equipo: string): Promise<(Diagnostico & { id: string; actualizado: string | null }) | null> {
+  const { db, perfil } = await sesion()
+  if (!cyberConfigurado()) return null
+  const { data: cat } = await db.from('categorias').select('id,diagnostico').eq('id', categoriaId).eq('activo', true).maybeSingle()
+  const tipo = cat?.diagnostico as TipoDiagnostico | null
+  if (!tipo) return null
+  const [{ datos }, { data: accesos }, fuera] = await Promise.all([
+    contextoDe(perfil.email, 'diagnostico'),
+    db.from('accesos').select('sistema,estado,hasta').eq('persona_id', perfil.id),
+    fueraDeHorario(),
+  ])
+  if (!datos?.encontrado) return null
+  const d = diagnosticar(tipo, datos, { accesos: accesos ?? [], fueraDeHorario: fuera, equipo: equipo.slice(0, 80) })
+  const { data: fila } = await admin()
+    .from('autoservicio')
+    .insert({ perfil_id: perfil.id, categoria_id: cat!.id, tipo, hallazgos: d.hallazgos })
+    .select('id')
+    .single()
+  const reportes = (datos.equipos ?? []).map((e) => e.ultimo_reporte).filter((x): x is string => !!x).sort()
+  return { ...d, id: fila?.id ?? '', actualizado: reportes.at(-1) ?? null }
+}
+
+/** "Listo, se solucionó": no se carga el pedido y queda contado como resuelto por autoservicio. */
+export async function seSoluciono(id: string) {
+  const { perfil } = await sesion()
+  if (id) await admin().from('autoservicio').update({ resultado: 'resuelto', actualizado_en: new Date().toISOString() }).eq('id', id).eq('perfil_id', perfil.id).eq('resultado', 'mostrado')
+  redirect('/portal?ok=solucionado')
 }

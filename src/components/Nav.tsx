@@ -44,6 +44,7 @@ export default function Nav({
   verTablero,
   avisos,
   sinLeer,
+  esJefe = false,
 }: {
   nombre: string
   email: string
@@ -52,6 +53,7 @@ export default function Nav({
   verTablero: boolean
   avisos: Aviso[]
   sinLeer: number
+  esJefe?: boolean
 }) {
   const pathname = usePathname()
   const staff = rol !== 'usuario'
@@ -60,6 +62,8 @@ export default function Nav({
     ? [
         { href: '/agente', label: 'Bandeja', tambien: ['/tickets'] },
         { href: '/accesos', label: 'Accesos' },
+        { href: '/turnos/agenda', label: 'Turnos', tambien: ['/turnos'] },
+        ...(esJefe ? [{ href: '/mi-equipo', label: 'Mi equipo' }] : []),
         ...(verTablero ? [{
           href: '/tablero',
           label: 'Tablero',
@@ -95,6 +99,7 @@ export default function Nav({
                   { href: '/admin/programados', label: 'Programados' },
                   { href: '/admin/proactivo', label: 'Soporte proactivo' },
                   { href: '/admin/politicas', label: 'Políticas' },
+                  { href: '/admin/turnos', label: 'Turnos' },
                   { href: '/admin/integraciones', label: 'Integraciones' },
                   { href: '/admin/datos', label: 'Datos' },
                   { href: '/admin/auditoria', label: 'Auditoría' },
@@ -106,6 +111,8 @@ export default function Nav({
     : [
         { href: '/portal', label: 'Inicio', tambien: ['/tickets'] },
         { href: '/mi-espacio', label: 'Mi espacio', tambien: ['/politicas'] },
+        { href: '/turnos', label: 'Turnos' },
+        ...(esJefe ? [{ href: '/mi-equipo', label: 'Mi equipo' }] : []),
         { href: '/kb', label: 'Ayuda' },
         { href: '/estado', label: 'Estado de servicios' },
       ]

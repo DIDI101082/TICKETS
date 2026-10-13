@@ -19,6 +19,17 @@ export default async function Proactivo({ searchParams }: { searchParams: Promis
   const ticketDe = new Map((abiertos ?? []).map((t) => [String(t.clave_externa), t]))
   const porTipo = (t: TipoProactivo) => (lista ?? []).filter((p) => p.tipo === t).length
   const tipos = Object.keys(TIPOS) as TipoProactivo[]
+  // Autoservicio: diagnósticos que vio la gente antes de cargar un pedido (últimos 30 días)
+  const { data: auto } = await db.from('autoservicio').select('resultado,hallazgos').gte('creado_en', new Date(Date.now() - 30 * 86400000).toISOString()).limit(5000)
+  const autos = (auto ?? []) as { resultado: string; hallazgos: { titulo: string; id: string }[] }[]
+  const resueltos = autos.filter((a) => a.resultado === 'resuelto').length
+  const conTicket = autos.filter((a) => a.resultado === 'ticket').length
+  const causas = new Map<string, number>()
+  for (const a of autos) for (const h of a.hallazgos ?? []) {
+    const k = h.id.split(':')[0]
+    causas.set(k, (causas.get(k) ?? 0) + 1)
+  }
+  const CAUSA: Record<string, string> = { uptime: 'Sin reiniciar hace días', reinicio: 'Reinicio pendiente', disco: 'Disco casi lleno', ram: 'Memoria llena', parches: 'Windows sin actualizar', eset: 'Amenaza del antivirus', av: 'Antivirus apagado', forti: 'FortiClient desactualizado', ad: 'Cuenta (bloqueo o contraseña)', m365: 'Microsoft 365 deshabilitada', mfa: 'Sin verificación en dos pasos', acceso: 'Permiso de VPN vencido o faltante', sinreporte: 'Equipo sin reportar' }
 
   return (
     <div className="space-y-6">
@@ -32,6 +43,23 @@ export default async function Proactivo({ searchParams }: { searchParams: Promis
       {sp.ok && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">Guardamos la configuración.</p>}
       {sp.abiertos != null && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">Revisión hecha: {sp.abiertos} ticket(s) nuevo(s) y {sp.resueltos} resuelto(s).</p>}
       {conf.ultimo_error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">Última revisión con error: {conf.ultimo_error}</p>}
+
+      <section className="tarjeta space-y-3 p-5">
+        <h2>Revisión antes de enviar un pedido (últimos 30 días)</h2>
+        <p className="max-w-3xl text-sm text-ink/60">
+          En las categorías con “Revisar antes de enviar” (Administración → Categorías), Desk le muestra a la persona lo que encuentra en su equipo y su cuenta y cómo resolverlo.
+        </p>
+        <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="rounded-lg bg-canvas p-3"><p className="font-display text-2xl tabular-nums">{autos.length}</p><p className="text-xs text-ink/55">revisiones mostradas</p></div>
+          <div className="rounded-lg bg-emerald-50 p-3 text-emerald-800"><p className="font-display text-2xl tabular-nums">{resueltos}</p><p className="text-xs">se resolvieron sin ticket</p></div>
+          <div className="rounded-lg bg-canvas p-3"><p className="font-display text-2xl tabular-nums">{conTicket}</p><p className="text-xs text-ink/55">siguieron con el pedido</p></div>
+        </div>
+        {causas.size > 0 && (
+          <p className="text-sm text-ink/70">
+            Lo que más encontramos: {[...causas.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${CAUSA[k] ?? k} (${n})`).join(' · ')}
+          </p>
+        )}
+      </section>
 
       <form action={guardarProactivo} className="tarjeta space-y-4 p-5">
         <label className="flex items-center gap-2 text-sm font-medium">

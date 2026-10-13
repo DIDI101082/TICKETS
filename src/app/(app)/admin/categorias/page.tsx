@@ -1,6 +1,7 @@
 import { exigirAdmin } from '@/lib/auth'
 import { PRIORIDADES, type Campo, type Categoria, type Sector } from '@/lib/tipos'
 import { guardarCategoria } from '../acciones'
+import { TIPOS_DIAGNOSTICO } from '@/lib/diagnostico'
 
 const aTexto = (campos: Campo[]) =>
   (campos ?? []).map((c) => [c.etiqueta, c.tipo, c.opciones.join(', '), c.requerido ? 'obligatorio' : ''].join(' | ').replace(/(\s\|\s)+$/, '')).join('\n')
@@ -52,6 +53,14 @@ function Formulario({ c, sectores, orden, mailDe }: { c?: Categoria; sectores: S
         <label className="rotulo">Checklist (una tarea por línea)</label>
         <textarea name="tareas" rows={3} defaultValue={(c?.tareas ?? []).join('\n')} className="campo text-[13px]" placeholder={'Deshabilitar la cuenta\n[Ciberseguridad] Quitar accesos a VPN y AWS\nRecuperar el equipo'} />
         <p className="mt-1 text-xs text-ink/45">Se copian a cada ticket nuevo de esta categoría y no se puede resolver hasta completarlas (o marcarlas como “no aplica”). Entre corchetes, el sector que la hace.</p>
+      </div>
+      <div>
+        <label className="rotulo">Revisar antes de enviar</label>
+        <select name="diagnostico" defaultValue={c?.diagnostico ?? ''} className="campo">
+          <option value="">No revisar</option>
+          {TIPOS_DIAGNOSTICO.map((t) => <option key={t.valor} value={t.valor}>{t.texto}</option>)}
+        </select>
+        <p className="mt-1 text-xs text-ink/45">Con los datos de Accusys Cyber, se le muestra a la persona lo que encontramos en su equipo o su cuenta y cómo resolverlo, antes de enviar el pedido.</p>
       </div>
       <div>
         <label className="rotulo">Consejos para quien pide</label>

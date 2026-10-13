@@ -112,7 +112,10 @@ export default async function MiEspacio({ searchParams }: { searchParams: Promis
                       {avisos.map((a) => <li key={a}>{a}</li>)}
                     </ul>
                   )}
-                  <Link href={pedir(catEquipo, `&equipo=${encodeURIComponent(e.codigo || e.hostname || '')}`)} className="btn-sec inline-block">Tengo un problema con este equipo</Link>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Link href={pedir(catEquipo, `&equipo=${encodeURIComponent(e.codigo || e.hostname || '')}`)} className="btn-sec inline-block">Tengo un problema con este equipo</Link>
+                    <Link href={`/turnos?equipo=${encodeURIComponent(e.codigo || e.hostname || '')}`} className="text-brand-600 hover:underline">Pedir turno con el CAU</Link>
+                  </div>
                 </article>
               )
             })

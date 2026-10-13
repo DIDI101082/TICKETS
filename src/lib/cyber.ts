@@ -21,6 +21,11 @@ export interface EquipoCyber {
   ultimo_parche: string | null
   ubicacion: string | null
   eset: { abiertas: number; ultima: { nombre: string | null; severidad: string | null; fecha: string } | null } | null
+  discos?: { unidad?: string; total_gb?: number | string; libre_gb?: number | string }[] | null
+  ram_total_gb?: number | null
+  ram_libre_gb?: number | null
+  arranque?: string | null
+  forticlient?: { nombre?: string; version: string | null; ultima: string | null } | null
 }
 
 export interface ContextoCyber {

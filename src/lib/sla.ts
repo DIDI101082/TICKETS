@@ -11,6 +11,7 @@ import { indicadores } from './metricas'
 import { duracion, APP_NOMBRE } from './formato'
 import { revisarAccesos } from './accesos'
 import { revisarProactivo } from './proactivo'
+import { recordarTurnos } from './turnos'
 
 // Minutos de anticipación con los que se avisa que un SLA está por vencer.
 const ANTICIPO = 30
@@ -36,7 +37,7 @@ export async function revisar() {
   const limite = new Date(ahora + ANTICIPO * 60000).toISOString()
   const { data: sectores } = await db.from('sectores').select('id,nombre,responsable_id')
   const sector = new Map((sectores ?? []).map((s) => [s.id as string, s]))
-  const resultado = { avisos: 0, escalados: 0, programados: 0, resumenes: 0, cerrados: 0, recordatorios: 0, adjuntosBorrados: 0, avisosAcceso: 0, revocaciones: 0, reconfirmaciones: 0, proactivosAbiertos: 0, proactivosResueltos: 0 }
+  const resultado = { avisos: 0, escalados: 0, programados: 0, resumenes: 0, cerrados: 0, recordatorios: 0, adjuntosBorrados: 0, avisosAcceso: 0, revocaciones: 0, reconfirmaciones: 0, proactivosAbiertos: 0, proactivosResueltos: 0, turnosRecordados: 0 }
 
   // 1. Avisos de SLA por vencer o vencido
   const [resp, resol] = await Promise.all([
@@ -137,6 +138,13 @@ export async function revisar() {
     resultado.proactivosResueltos = p.resueltos
   } catch (e) {
     console.error('Soporte proactivo:', e)
+  }
+
+  // 3 quater. Recordatorio de los turnos con el CAU
+  try {
+    resultado.turnosRecordados = await recordarTurnos()
+  } catch (e) {
+    console.error('Recordatorio de turnos:', e)
   }
 
   // 4. Resumen mensual para el referente de cada organización (una vez por mes, sobre el mes anterior)

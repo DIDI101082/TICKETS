@@ -8,6 +8,7 @@ import { IMPACTOS, URGENCIAS, type Categoria } from '@/lib/tipos'
 import { pegarImagenes } from '@/components/pegar'
 import { campoFechaInput } from '@/lib/formato'
 import { asistente, crear } from './acciones'
+import Diagnostico from './Diagnostico'
 
 export interface Inicial {
   categoriaId: string
@@ -15,6 +16,8 @@ export interface Inicial {
   descripcion: string
   // respuestas del formulario, por etiqueta del campo
   datos: Record<string, string>
+  // "Para quién es" (desde Mi equipo)
+  para?: string
 }
 
 interface Borrador extends Inicial {
@@ -142,6 +145,13 @@ export default function Formulario({ categorias, inicial, enNombre = false }: { 
             </div>
           )}
         </div>
+      )}
+
+      {categoria?.diagnostico && !enNombre && (
+        <Diagnostico
+          categoriaId={categoria.id}
+          equipo={Object.entries(b.datos).find(([k]) => /equipo|inventario/i.test(k))?.[1] ?? ''}
+        />
       )}
 
       <div>

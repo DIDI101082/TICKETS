@@ -67,6 +67,11 @@ Mesa de ayuda de Accusys: sistema de tickets para usuarios internos y clientes e
 - Capacitaciones de seguridad (de Accusys Cyber) y resultado de los simulacros de phishing en Mi espacio.
 - Pedido "Viaje o vacaciones": VPN fuera de horario hasta la vuelta (con vencimiento automático), respuesta automática, quién te cubre y recomendaciones de seguridad para viajar. Cada categoría puede tener sus propios consejos.
 
+**Autoservicio, turnos y jefes**
+- Revisión antes de enviar: al elegir "Falla de equipo", "Red, VPN o servidores" o "Acceso o contraseña", Desk revisa con los datos de Accusys Cyber el equipo y la cuenta de la persona (días sin reiniciar, disco o memoria llenos, Windows sin actualizar, FortiClient viejo, usuario bloqueado, contraseña por vencer, permiso de VPN vencido…) y le muestra cómo resolverlo. Si se soluciona, no se carga el pedido; si no, el diagnóstico queda como nota interna. Se mide en Administración → Soporte proactivo.
+- Turnos con el CAU: la persona reserva día y hora (en su piso, en Córdoba o por Teams), recibe confirmación, recordatorio y el evento para Outlook. El equipo ve la agenda del día y marca atendido o ausente. Lugares, horarios, cupo y feriados en Administración → Turnos.
+- Mi equipo: quien tiene gente a cargo (jefe en Personas) ve sus accesos y los reconfirma o pide quitarlos, ve políticas y capacitaciones pendientes y el estado de sus equipos, y pide altas, bajas o cambios de área en un clic.
+
 **Accusys Cyber en cada ticket** (opcional)
 - Ficha de quien pide: área y puesto, equipos asignados con el estado del agente (antivirus, cifrado, último reporte), detecciones de ESET, MFA, cuenta de AD (bloqueada o no) y de Microsoft 365, y licencias.
 
@@ -89,7 +94,7 @@ Mesa de ayuda de Accusys: sistema de tickets para usuarios internos y clientes e
 ### 1. Supabase
 
 1. Crear un proyecto.
-2. **SQL Editor** → ejecutar, en este orden: `supabase/schema.sql`, `002_ampliacion.sql`, `003_formularios.sql` (formularios de pedidos frecuentes, opcional), `004_portal.sql`, `005_administracion.sql`, `006_accesos_y_conocimiento.sql`, `007_checklists_y_proactivo.sql` y `008_phishing_politicas_viajes.sql`. Todos se pueden correr más de una vez.
+2. **SQL Editor** → ejecutar, en este orden: `supabase/schema.sql`, `002_ampliacion.sql`, `003_formularios.sql` (formularios de pedidos frecuentes, opcional), `004_portal.sql`, `005_administracion.sql`, `006_accesos_y_conocimiento.sql`, `007_checklists_y_proactivo.sql`, `008_phishing_politicas_viajes.sql` y `009_diagnostico_turnos_equipo.sql`. Todos se pueden correr más de una vez.
 3. **Authentication → URL Configuration**: *Site URL* con la dirección de la app y `https://TU-APP/auth/callback` en *Redirect URLs*.
 4. (Opcional) **Authentication → Providers → Azure** para el ingreso con Microsoft, y `NEXT_PUBLIC_MICROSOFT=1` en Vercel.
 

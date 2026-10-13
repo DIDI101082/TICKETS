@@ -83,6 +83,7 @@ export interface Categoria {
   tareas?: string[]
   consejos?: string | null
   acceso_nombre?: string | null
+  diagnostico?: 'equipo' | 'vpn' | 'cuenta' | null
 }
 
 export interface TicketTarea {

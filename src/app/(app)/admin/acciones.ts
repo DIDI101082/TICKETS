@@ -136,6 +136,7 @@ export async function guardarCategoria(id: string | null, form: FormData) {
     tareas: String(form.get('tareas') || '').split('\n').map((l) => l.trim().slice(0, 300)).filter(Boolean).slice(0, 30),
     consejos: texto(form.get('consejos'), 2000) || null,
     acceso_nombre: texto(form.get('acceso_nombre'), 120) || null,
+    diagnostico: ['equipo', 'vpn', 'cuenta'].includes(String(form.get('diagnostico'))) ? String(form.get('diagnostico')) : null,
   }
   if (!fila.nombre) return
   const db = admin()
