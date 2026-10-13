@@ -11,7 +11,7 @@ import { auditar } from '@/lib/auditoria'
 import { APP_NOMBRE } from '@/lib/formato'
 import { redactarArticulo, redactarBorrador, resumir, type Hilo } from '@/lib/ia'
 import { claves, coincidencias } from '@/lib/texto'
-import { ESTADOS, PRIORIDADES, etiquetaEstado, etiquetaPrioridad, type Mensaje, type Ticket } from '@/lib/tipos'
+import { ESTADOS, PRIORIDADES, etiquetaEstado, etiquetaPrioridad, type Mensaje, type Ticket, type TicketTarea } from '@/lib/tipos'
 
 // Toda acción empieza leyendo el ticket con la sesión del usuario: si no tiene permiso, no lo ve.
 async function ticketVisible(ticketId: string) {
@@ -145,6 +145,11 @@ export async function actualizar(ticketId: string, form: FormData) {
 
   if (Object.keys(cambios).length) {
     const { error } = await db.from('tickets').update(cambios).eq('id', ticketId)
+    // Checklist incompleto: la base no deja resolver ni cerrar (007_checklists_y_proactivo.sql)
+    if (error && /TAREAS_PENDIENTES/.test(error.message)) {
+      revalidatePath(`/tickets/${ticketId}`)
+      redirect(`/tickets/${ticketId}?aviso=tareas`)
+    }
     if (error) throw new Error(`No se pudo actualizar el ticket: ${error.message}`)
     await registrarEvento(ticketId, perfil.nombre, notas.join(' · '))
     await auditar(perfil, 'Modificó ticket', 'ticket', `#${t.numero}`, notas.join(' · '))
@@ -184,7 +189,16 @@ export async function tomar(ticketId: string) {
 export async function cerrarPropio(ticketId: string) {
   const { perfil, t } = await ticketVisible(ticketId)
   if (t.solicitante_id === perfil.id && t.estado !== 'cerrado') {
-    await admin().from('tickets').update({ estado: 'cerrado' }).eq('id', ticketId)
+    const { error } = await admin().from('tickets').update({ estado: 'cerrado' }).eq('id', ticketId)
+    if (error && /TAREAS_PENDIENTES/.test(error.message)) {
+      // Con tareas pendientes (por ejemplo, quitar accesos en una baja) no se cierra: se avisa a quien lo atiende.
+      await registrarEvento(ticketId, perfil.nombre, 'El solicitante indicó que ya no lo necesita (no se cerró: quedan tareas del checklist)')
+      if (t.asignado_id) {
+        await avisarPersona({ perfilId: t.asignado_id, ticket: t, tipo: 'otro', titulo: 'El solicitante ya no lo necesita', texto: `${perfil.nombre || perfil.email} indicó que ya no necesita el pedido #${t.numero}, pero quedan tareas del checklist. Revisá si hay que completarlas o marcarlas como "no aplica".` })
+      }
+      revalidatePath(`/tickets/${ticketId}`)
+      redirect(`/tickets/${ticketId}?aviso=tareas_usuario`)
+    }
     await registrarEvento(ticketId, perfil.nombre, 'El solicitante cerró el ticket')
   }
   volver(ticketId)
@@ -418,4 +432,33 @@ export async function articuloDesdeTicket(ticketId: string) {
   await auditar(perfil, 'Creó artículo desde ticket', 'articulo', borrador.titulo, `#${t.numero}`)
   revalidatePath('/kb')
   redirect(`/kb/editar/${data.id}?desde=${t.numero}${ia ? '&ia=1' : ''}`)
+}
+
+// ---------- Checklist del pedido ----------
+
+export async function marcarTarea(ticketId: string, tareaId: string, form: FormData) {
+  const { perfil, t } = await ticketStaff(ticketId)
+  const estado = String(form.get('estado') || '')
+  if (!['pendiente', 'hecha', 'no_aplica'].includes(estado)) volver(ticketId)
+  const nota = String(form.get('nota') || '').trim().slice(0, 300)
+  const db = admin()
+  const { data } = await db
+    .from('ticket_tareas')
+    .update({ estado, hecha_por: estado === 'pendiente' ? '' : perfil.nombre || perfil.email, hecha_en: estado === 'pendiente' ? null : new Date().toISOString(), nota })
+    .eq('id', tareaId)
+    .eq('ticket_id', ticketId)
+    .select('texto')
+  const texto = (data?.[0]?.texto as string | undefined) ?? 'tarea'
+  const que = estado === 'hecha' ? 'Completó' : estado === 'no_aplica' ? 'Marcó como no aplica' : 'Reabrió'
+  await registrarEvento(ticketId, perfil.nombre, `${que}: ${texto}${nota ? ` (${nota})` : ''}`)
+
+  // Checklist completo: aviso a quien lo tiene asignado para que lo resuelva
+  if (estado !== 'pendiente') {
+    const { data: todas } = await db.from('ticket_tareas').select('estado').eq('ticket_id', ticketId)
+    const lista = (todas ?? []) as Pick<TicketTarea, 'estado'>[]
+    if (lista.length && lista.every((x) => x.estado !== 'pendiente') && t.asignado_id && t.asignado_id !== perfil.id) {
+      await avisarPersona({ perfilId: t.asignado_id, ticket: t, tipo: 'otro', titulo: 'Checklist completo', texto: `Se completaron todas las tareas del pedido #${t.numero}. Ya se puede resolver.` })
+    }
+  }
+  volver(ticketId)
 }

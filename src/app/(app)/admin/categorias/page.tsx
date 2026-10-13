@@ -48,6 +48,11 @@ function Formulario({ c, sectores, orden, mailDe }: { c?: Categoria; sectores: S
         <textarea name="campos" rows={4} defaultValue={c ? aTexto(c.campos) : ''} className="campo font-mono text-[13px]" placeholder={'Sistema o servicio | texto | | obligatorio\n¿A cuántos afecta? | lista | Solo a mí, A mi equipo | obligatorio\nHasta cuándo | fecha\nDetalle | párrafo'} />
         <p className="mt-1 text-xs text-ink/45">Un campo por línea: Etiqueta | tipo (texto, párrafo, lista o fecha) | opciones separadas por coma | obligatorio</p>
       </div>
+      <div>
+        <label className="rotulo">Checklist (una tarea por línea)</label>
+        <textarea name="tareas" rows={3} defaultValue={(c?.tareas ?? []).join('\n')} className="campo text-[13px]" placeholder={'Deshabilitar la cuenta\n[Ciberseguridad] Quitar accesos a VPN y AWS\nRecuperar el equipo'} />
+        <p className="mt-1 text-xs text-ink/45">Se copian a cada ticket nuevo de esta categoría y no se puede resolver hasta completarlas (o marcarlas como “no aplica”). Entre corchetes, el sector que la hace.</p>
+      </div>
       <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
         <div>
           <label className="rotulo">Quién aprueba (mails, en orden)</label>

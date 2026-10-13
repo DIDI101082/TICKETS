@@ -92,6 +92,7 @@ export default function Nav({
                   { href: '/admin/personas', label: 'Personas' },
                   { href: '/admin/reglas', label: 'Reglas' },
                   { href: '/admin/programados', label: 'Programados' },
+                  { href: '/admin/proactivo', label: 'Soporte proactivo' },
                   { href: '/admin/integraciones', label: 'Integraciones' },
                   { href: '/admin/datos', label: 'Datos' },
                   { href: '/admin/auditoria', label: 'Auditoría' },
@@ -102,6 +103,7 @@ export default function Nav({
       ]
     : [
         { href: '/portal', label: 'Inicio', tambien: ['/tickets'] },
+        { href: '/mi-espacio', label: 'Mi espacio' },
         { href: '/kb', label: 'Ayuda' },
         { href: '/estado', label: 'Estado de servicios' },
       ]

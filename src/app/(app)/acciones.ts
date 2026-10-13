@@ -145,7 +145,12 @@ export async function accionEnLote(form: FormData) {
       await svc.from('tickets').update({ eliminado_en: new Date().toISOString(), eliminado_por: perfil.nombre || perfil.email }).eq('id', t.id)
       continue
     }
-    await svc.from('tickets').update(cambios).eq('id', t.id)
+    const { error } = await svc.from('tickets').update(cambios).eq('id', t.id)
+    if (error) {
+      // Por ejemplo, un checklist incompleto no deja resolverlo: ese ticket se saltea
+      await registrarEvento(t.id, perfil.nombre, `No se aplicó la acción en lote: ${/TAREAS_PENDIENTES/.test(error.message) ? 'tiene tareas del checklist sin completar' : error.message}`)
+      continue
+    }
     await registrarEvento(t.id, perfil.nombre, `En lote · ${notas.join(' · ')}`)
     if (cambios.asignado_id && cambios.asignado_id !== perfil.id && cambios.asignado_id !== t.asignado_id) {
       await avisarPersona({ perfilId: cambios.asignado_id, ticket: t, tipo: 'otro', titulo: 'Te asignaron un ticket', texto: `${perfil.nombre} te asignó el pedido #${t.numero}: ${t.asunto}` })

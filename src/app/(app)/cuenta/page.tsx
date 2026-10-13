@@ -16,7 +16,7 @@ export default async function Cuenta({ searchParams }: { searchParams: Promise<{
     <div className="mx-auto max-w-xl space-y-5">
       <div>
         <h1>Mi cuenta</h1>
-        <p className="text-sm text-ink/60">{perfil.email} · {ROL[perfil.rol]}</p>
+        <p className="text-sm text-ink/60">{perfil.email} · {ROL[perfil.rol]} · <Link href="/mi-espacio" className="text-brand-600 hover:underline">Mis equipos, accesos y licencias</Link></p>
       </div>
       {ok && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">Guardamos los cambios.</p>}
       <form action={guardarCuenta} className="tarjeta space-y-4 p-5">

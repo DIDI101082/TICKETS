@@ -43,13 +43,18 @@ export async function contextoDe(email: string, ticket: string): Promise<{ datos
   try {
     const r = await fetch(`${base}/rest/v1/rpc/tickets_contexto`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', apikey: anon, authorization: `Bearer ${anon}` },
+      // Las claves nuevas de Supabase (sb_publishable_…) van solo en "apikey"; las anon clásicas (JWT) también como Bearer
+      headers: { 'content-type': 'application/json', apikey: anon, ...(anon.startsWith('eyJ') ? { authorization: `Bearer ${anon}` } : {}) },
       body: JSON.stringify({ p_token: process.env.CYBER_CONTEXTO_TOKEN, p_email: email, p_ticket: ticket }),
       cache: 'no-store',
       signal: AbortSignal.timeout(5000),
     })
-    if (r.status === 401 || r.status === 403) return { error: 'La clave de Accusys Cyber no es válida. Generá una nueva con tickets_nuevo_token().' }
-    if (r.status === 404) return { error: 'Falta ejecutar tickets-contexto.sql en Accusys Cyber.' }
+    if (!r.ok) {
+      const cuerpo = await r.text().catch(() => '')
+      if (/No autorizado/i.test(cuerpo)) return { error: 'CYBER_CONTEXTO_TOKEN no coincide con la clave de Accusys Cyber. Generá una nueva con tickets_nuevo_token(), cargala de nuevo y volvé a desplegar.' }
+      if (/PGRST202|Could not find the function/i.test(cuerpo) || r.status === 404) return { error: 'Falta ejecutar tickets-contexto.sql en el Supabase de Accusys Cyber.' }
+      if (r.status === 401 || /api key|apikey|JWT/i.test(cuerpo)) return { error: 'CYBER_SUPABASE_ANON_KEY no es válida: tiene que ser la clave anon (o publishable) del proyecto de Accusys Cyber.' }
+    }
     if (!r.ok) return { error: `Accusys Cyber respondió ${r.status}.` }
     return { datos: (await r.json()) as ContextoCyber }
   } catch {

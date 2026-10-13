@@ -9,13 +9,16 @@ export default async function Portal({ searchParams }: { searchParams: Promise<{
   const { db, perfil } = await sesion()
 
   const veOrg = perfil.ve_organizacion && !!perfil.organizacion_id
-  const [rpend, rcat, rserv, rprop] = await Promise.all([
+  const [rpend, rcat, rserv, rprop, rdet] = await Promise.all([
     db.from('tickets').select('id', { count: 'exact', head: true }).eq('aprobador_id', perfil.id).eq('aprobacion_estado', 'pendiente'),
     db.from('categorias').select('*').eq('activo', true).order('orden').order('nombre'),
     db.from('servicios').select('*').neq('estado', 'operativo').order('orden'),
     // Los pedidos propios sirven para ordenar los accesos directos por lo que más usa esta persona.
     db.from('tickets').select('categoria_id').eq('solicitante_id', perfil.id).order('creado_en', { ascending: false }).limit(100),
+    // Problemas que la revisión automática detectó en sus equipos
+    db.from('tickets').select('id', { count: 'exact', head: true }).like('clave_externa', 'proactivo:%').eq('solicitante_id', perfil.id).in('estado', ['abierto', 'en_curso', 'en_espera']),
   ])
+  const detectados = rdet.count ?? 0
   const pendientes = rpend.count ?? 0
   const conProblemas = (rserv.data ?? []) as Servicio[]
   const uso = new Map<string, number>()
@@ -55,6 +58,11 @@ export default async function Portal({ searchParams }: { searchParams: Promise<{
 
   return (
     <div className="space-y-7">
+      {detectados > 0 && (
+        <Link href="/mi-espacio" className="block rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <strong>Detectamos {detectados === 1 ? 'algo' : `${detectados} cosas`} en tus equipos.</strong> Mirá qué es y qué podés hacer →
+        </Link>
+      )}
       <section className="rounded-2xl bg-[#0A2A6E] bg-[linear-gradient(135deg,#0A2466_0%,#0B3A9E_55%,#1449C8_100%)] px-6 py-8 text-white">
         <h1 className="!text-white">{nombre ? `Hola, ${nombre}` : 'Hola'}. ¿En qué te ayudamos?</h1>
         <form action="/kb" className="mt-4 flex max-w-2xl gap-2">

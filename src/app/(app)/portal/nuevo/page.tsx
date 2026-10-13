@@ -3,7 +3,7 @@ import { sesion } from '@/lib/auth'
 import type { Categoria, Servicio, Ticket } from '@/lib/tipos'
 import Formulario, { type Inicial } from './formulario'
 
-export default async function Nuevo({ searchParams }: { searchParams: Promise<{ cat?: string; desde?: string; para?: string }> }) {
+export default async function Nuevo({ searchParams }: { searchParams: Promise<{ cat?: string; desde?: string; para?: string; equipo?: string }> }) {
   const sp = await searchParams
   const { db, staff } = await sesion()
   const enNombre = staff && sp.para === 'otro'
@@ -28,7 +28,10 @@ export default async function Nuevo({ searchParams }: { searchParams: Promise<{ 
       }
     }
   } else if (sp.cat && categorias.some((c) => c.id === sp.cat)) {
-    inicial = { categoriaId: sp.cat, asunto: '', descripcion: '', datos: {} }
+    // Desde "Mi espacio": el equipo ya viene cargado en el campo de equipo / n.º de inventario de la categoría
+    const campoEquipo = categorias.find((c) => c.id === sp.cat)?.campos?.find((c) => /equipo|inventario/i.test(c.etiqueta))
+    const equipo = (sp.equipo ?? '').slice(0, 80)
+    inicial = { categoriaId: sp.cat, asunto: '', descripcion: '', datos: campoEquipo && equipo ? { [campoEquipo.etiqueta]: equipo } : {} }
   }
 
   return (

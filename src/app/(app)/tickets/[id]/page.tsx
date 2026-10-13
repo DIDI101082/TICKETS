@@ -7,7 +7,7 @@ import { iaDisponible } from '@/lib/ia'
 import { claves, coincidencias, rellenar } from '@/lib/texto'
 import { aInputFecha, fecha, slaRespuesta, slaResolucion, tamano } from '@/lib/formato'
 import { InsigniaEstado, InsigniaPrioridad, TextoSla } from '@/components/Insignias'
-import { ESTADOS, PRIORIDADES, etiquetaImpacto, etiquetaUrgencia, type Acceso, type Adjunto, type Mensaje, type Sector, type Ticket } from '@/lib/tipos'
+import { ESTADOS, PRIORIDADES, etiquetaImpacto, etiquetaUrgencia, type Acceso, type Adjunto, type Mensaje, type Sector, type Ticket, type TicketTarea, partirTarea } from '@/lib/tipos'
 import { cambiarVencimiento, quitarAhora } from '../../accesos/acciones'
 import { Suspense } from 'react'
 import ContextoCyber from './ContextoCyber'
@@ -15,7 +15,7 @@ import Pasos from '@/components/Pasos'
 import Presencia from '@/components/Presencia'
 import { enviarAPapelera, registrarTiempo } from '../../acciones'
 import Respuesta from './Respuesta'
-import { agregarSeguidor, quitarSeguidor, reabrir, actualizar, articuloDesdeTicket, calificar, cerrarPropio, decidirAprobacion, desvincular, fusionar, generarResumen, pedirAprobacion, tomar, vincular } from './acciones'
+import { agregarSeguidor, quitarSeguidor, reabrir, actualizar, articuloDesdeTicket, calificar, marcarTarea, cerrarPropio, decidirAprobacion, desvincular, fusionar, generarResumen, pedirAprobacion, tomar, vincular } from './acciones'
 
 function Adjuntos({ lista }: { lista: Adjunto[] }) {
   if (!lista.length) return null
@@ -56,8 +56,9 @@ const APROBACION: Record<string, { texto: string; clase: string }> = {
   rechazado: { texto: 'Rechazado', clase: 'bg-red-50 text-red-700' },
 }
 
-export default async function Detalle({ params }: { params: Promise<{ id: string }> }) {
+export default async function Detalle({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ aviso?: string }> }) {
   const { id } = await params
+  const { aviso } = await searchParams
   const { db, perfil, staff, esAdmin, supervisor } = await sesion()
 
   const { data } = await db.from('tickets').select('*').eq('id', id).maybeSingle()
@@ -128,6 +129,9 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
   // Accesos: el que otorgó este pedido, o el que este ticket tiene que quitar (si ya se ejecutó 006_accesos_y_conocimiento.sql)
   const { data: racc2 } = await db.from('accesos').select('*').or(`ticket_id.eq.${t.id},revocar_ticket_id.eq.${t.id}`)
   const accesosTicket = (racc2 ?? []) as Acceso[]
+  const { data: rtar } = await db.from('ticket_tareas').select('*').eq('ticket_id', t.id).order('orden')
+  const tareas = (rtar ?? []) as TicketTarea[]
+  const tareasListas = tareas.filter((x) => x.estado !== 'pendiente').length
   const { data: rart } = staff ? await db.from('articulos').select('id,titulo,publicado').eq('ticket_origen_id', t.id).limit(1) : { data: [] }
   const articulo = ((rart ?? []) as { id: string; titulo: string; publicado: boolean }[])[0]
   // Para los datos de Accusys Cyber: la persona para quien es el pedido o, si no, quien lo pidió
@@ -166,6 +170,16 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
         )}
       </div>
 
+      {aviso === 'tareas' && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800" role="alert">
+          No se puede resolver ni cerrar: quedan {tareas.length - tareasListas} tarea(s) del checklist. Completalas o marcá como “no aplica” las que no correspondan.
+        </p>
+      )}
+      {aviso === 'tareas_usuario' && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">
+          Le avisamos a quien lo atiende que ya no lo necesitás. Queda abierto hasta que el equipo termine las tareas pendientes (por ejemplo, quitar accesos).
+        </p>
+      )}
       {!staff && !fusion && (
         <div className="tarjeta space-y-3 p-4">
           <Pasos t={t} />
@@ -230,6 +244,61 @@ export default async function Detalle({ params }: { params: Promise<{ id: string
             <p className="whitespace-pre-wrap text-sm leading-relaxed">{t.descripcion}</p>
             <Adjuntos lista={adjuntos.filter((a) => !a.mensaje_id)} />
           </article>
+
+          {tareas.length > 0 && (
+            <div className="tarjeta space-y-3 p-4 text-sm">
+              <div className="flex items-baseline justify-between gap-2">
+                <h2>{staff ? 'Checklist' : 'Avance del pedido'}</h2>
+                <span className="tabular-nums text-ink/60">{tareasListas} de {tareas.length}</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-line/10" role="progressbar" aria-valuemin={0} aria-valuemax={tareas.length} aria-valuenow={tareasListas} aria-label="Tareas completadas">
+                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.round((100 * tareasListas) / tareas.length)}%` }} />
+              </div>
+              <ul className="space-y-1.5">
+                {tareas.map((x) => {
+                  const { sector, texto } = partirTarea(x.texto)
+                  return (
+                    <li key={x.id} className="flex items-start gap-2">
+                      <span aria-hidden className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border text-[10px] ${x.estado === 'hecha' ? 'border-emerald-500 bg-emerald-500 text-white' : x.estado === 'no_aplica' ? 'border-line/20 bg-line/10 text-ink/50' : 'border-line/30'}`}>
+                        {x.estado === 'hecha' ? '✓' : x.estado === 'no_aplica' ? '–' : ''}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className={x.estado === 'no_aplica' ? 'text-ink/45 line-through' : x.estado === 'hecha' ? 'text-ink/70' : ''}>{texto}</span>
+                        {sector && <span className="pill ml-1.5 bg-line/[0.06] text-ink/60">{sector}</span>}
+                        {x.estado !== 'pendiente' && staff && (
+                          <span className="block text-xs text-ink/45">{x.estado === 'hecha' ? 'Hecha' : 'No aplica'} · {x.hecha_por} · {fecha(x.hecha_en)}{x.nota ? ` · ${x.nota}` : ''}</span>
+                        )}
+                      </span>
+                      {staff && (
+                        x.estado === 'pendiente' ? (
+                          <span className="flex shrink-0 gap-2">
+                            <form action={marcarTarea.bind(null, t.id, x.id)}>
+                              <input type="hidden" name="estado" value="hecha" />
+                              <button className="text-xs font-medium text-brand-600 hover:underline">Hecha</button>
+                            </form>
+                            <details className="relative">
+                              <summary className="cursor-pointer list-none text-xs text-ink/50 hover:text-ink">No aplica</summary>
+                              <form action={marcarTarea.bind(null, t.id, x.id)} className="absolute right-0 z-10 mt-1 flex w-64 gap-1 rounded-lg border border-line/10 bg-surface p-2 shadow-lg">
+                                <input type="hidden" name="estado" value="no_aplica" />
+                                <input name="nota" required placeholder="Por qué no aplica" className="campo py-1 text-xs" />
+                                <button className="btn-sec px-2 py-1 text-xs">OK</button>
+                              </form>
+                            </details>
+                          </span>
+                        ) : (
+                          <form action={marcarTarea.bind(null, t.id, x.id)} className="shrink-0">
+                            <input type="hidden" name="estado" value="pendiente" />
+                            <button className="text-xs text-ink/45 hover:text-ink">Deshacer</button>
+                          </form>
+                        )
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+              {staff && tareasListas < tareas.length && <p className="text-xs text-ink/45">El ticket no se puede resolver hasta completar el checklist.</p>}
+            </div>
+          )}
 
           {mensajes.map((m) => (
             <article

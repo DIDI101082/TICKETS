@@ -133,6 +133,7 @@ export async function guardarCategoria(id: string | null, form: FormData) {
     es_acceso: form.get('es_acceso') === 'on',
     acceso_dias_max: form.get('acceso_dias_max') ? Math.min(3650, Math.max(1, entero(form.get('acceso_dias_max'), 30))) : null,
     recertificar_dias: Math.min(730, Math.max(7, entero(form.get('recertificar_dias'), 90))),
+    tareas: String(form.get('tareas') || '').split('\n').map((l) => l.trim().slice(0, 300)).filter(Boolean).slice(0, 30),
   }
   if (!fila.nombre) return
   const db = admin()

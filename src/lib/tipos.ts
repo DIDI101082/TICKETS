@@ -80,6 +80,24 @@ export interface Categoria {
   es_acceso?: boolean
   acceso_dias_max?: number | null
   recertificar_dias?: number
+  tareas?: string[]
+}
+
+export interface TicketTarea {
+  id: string
+  ticket_id: string
+  orden: number
+  texto: string
+  estado: 'pendiente' | 'hecha' | 'no_aplica'
+  hecha_por: string
+  hecha_en: string | null
+  nota: string
+}
+
+/** "[Ciberseguridad] Quitar accesos" → sector "Ciberseguridad" y texto "Quitar accesos". */
+export function partirTarea(t: string) {
+  const m = t.match(/^\s*\[([^\]]{1,40})\]\s*(.*)$/)
+  return m ? { sector: m[1], texto: m[2] } : { sector: '', texto: t }
 }
 
 export interface Dato {

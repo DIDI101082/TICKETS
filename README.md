@@ -56,6 +56,11 @@ Mesa de ayuda de Accusys: sistema de tickets para usuarios internos y clientes e
 - Pantalla "Accesos" con vigentes, por vencer, a reconfirmar y por quitar; cada persona ve los suyos en "Mi cuenta".
 - Campos de tipo fecha en los formularios (calendario).
 
+**Mi espacio, soporte proactivo y checklists**
+- "Mi espacio": cada persona ve sus equipos (con su estado), sus accesos con vencimiento, sus licencias y su cuenta, y pide ayuda sobre cada cosa con un clic.
+- Soporte proactivo: Accusys Cyber detecta equipos que no se conectan, disco lleno, antivirus apagado, reinicio pendiente, disco sin cifrar o amenazas de ESET, y se abre el ticket a nombre de la persona con un aviso de qué hacer. Se resuelve solo cuando el problema desaparece. Se configura en Administración → Soporte proactivo.
+- Checklists por tipo de pedido (alta, baja, cambio de área, armado de servidor): las tareas se copian a cada ticket y no se puede resolver hasta completarlas.
+
 **Accusys Cyber en cada ticket** (opcional)
 - Ficha de quien pide: área y puesto, equipos asignados con el estado del agente (antivirus, cifrado, último reporte), detecciones de ESET, MFA, cuenta de AD (bloqueada o no) y de Microsoft 365, y licencias.
 
@@ -78,7 +83,7 @@ Mesa de ayuda de Accusys: sistema de tickets para usuarios internos y clientes e
 ### 1. Supabase
 
 1. Crear un proyecto.
-2. **SQL Editor** → ejecutar, en este orden: `supabase/schema.sql`, `002_ampliacion.sql`, `003_formularios.sql` (formularios de pedidos frecuentes, opcional), `004_portal.sql`, `005_administracion.sql` y `006_accesos_y_conocimiento.sql`. Todos se pueden correr más de una vez.
+2. **SQL Editor** → ejecutar, en este orden: `supabase/schema.sql`, `002_ampliacion.sql`, `003_formularios.sql` (formularios de pedidos frecuentes, opcional), `004_portal.sql`, `005_administracion.sql`, `006_accesos_y_conocimiento.sql` y `007_checklists_y_proactivo.sql`. Todos se pueden correr más de una vez.
 3. **Authentication → URL Configuration**: *Site URL* con la dirección de la app y `https://TU-APP/auth/callback` en *Redirect URLs*.
 4. (Opcional) **Authentication → Providers → Azure** para el ingreso con Microsoft, y `NEXT_PUBLIC_MICROSOFT=1` en Vercel.
 
@@ -92,7 +97,7 @@ Subir el contenido de esta carpeta a un repo, importarlo en Vercel y cargar las 
 
 ### Accusys Cyber (opcional)
 
-1. En el SQL Editor de **Accusys Cyber** ejecutar `tickets-contexto.sql` (está en el repo de Accusys Cyber) y después `select public.tickets_nuevo_token();`.
+1. En el SQL Editor de **Accusys Cyber** ejecutar `tickets-contexto.sql` y `tickets-proactivo.sql` (están en el repo de Accusys Cyber) y después `select public.tickets_nuevo_token();`.
 2. En Vercel de esta app cargar `CYBER_SUPABASE_URL` y `CYBER_SUPABASE_ANON_KEY` (los de Accusys Cyber), `CYBER_CONTEXTO_TOKEN` (la clave del paso 1, como Secret) y `NEXT_PUBLIC_CYBER_URL`.
 
 ### Actualizar una instalación existente
