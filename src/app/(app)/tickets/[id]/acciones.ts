@@ -8,6 +8,7 @@ import { archivosDe, avisarResuelto, registrarEvento, subirAdjuntos } from '@/li
 import { avisarInteresados, avisarPersona } from '@/lib/notificar'
 import { registrarDecision, solicitarAprobacion } from '@/lib/aprobaciones'
 import { auditar } from '@/lib/auditoria'
+import { APP_NOMBRE } from '@/lib/formato'
 import { redactarArticulo, redactarBorrador, resumir, type Hilo } from '@/lib/ia'
 import { claves, coincidencias } from '@/lib/texto'
 import { ESTADOS, PRIORIDADES, etiquetaEstado, etiquetaPrioridad, type Mensaje, type Ticket } from '@/lib/tipos'
@@ -211,7 +212,7 @@ export async function pedirAprobacion(ticketId: string, form: FormData) {
   const email = String(form.get('email') || '').trim().toLowerCase()
   const { data: aprobador } = await admin().from('perfiles').select('id,nombre,email').ilike('email', email).maybeSingle()
   if (!aprobador) {
-    await registrarEvento(ticketId, perfil.nombre, `No se pudo pedir aprobación: ${email || 'sin email'} no tiene cuenta en la mesa de ayuda`)
+    await registrarEvento(ticketId, perfil.nombre, `No se pudo pedir aprobación: ${email || 'sin email'} no tiene cuenta en ${APP_NOMBRE}`)
     volver(ticketId)
   }
   await solicitarAprobacion(t, aprobador, perfil.nombre)
@@ -360,7 +361,7 @@ export async function borradorIA(ticketId: string): Promise<{ texto?: string; er
     .sort((a, b) => b.puntos - a.puntos)
     .slice(0, 3)
 
-  const texto = await redactarBorrador(await hilo(t), utiles, perfil.nombre || 'Mesa de Ayuda')
+  const texto = await redactarBorrador(await hilo(t), utiles, perfil.nombre || APP_NOMBRE)
   return texto ? { texto } : { error: 'No se pudo generar el borrador. Revisá que la clave de IA esté configurada.' }
 }
 

@@ -8,7 +8,7 @@ import { SCRIPT_TEMA } from '@/lib/tema'
 const display = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['600', '700', '800'], variable: '--font-display' })
 const body = Inter({ subsets: ['latin'], variable: '--font-body' })
 
-export const metadata: Metadata = { title: APP_NOMBRE, description: 'Sistema de tickets y mesa de ayuda' }
+export const metadata: Metadata = { title: APP_NOMBRE, description: 'Mesa de ayuda de Accusys: pedidos, accesos y base de conocimiento' }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

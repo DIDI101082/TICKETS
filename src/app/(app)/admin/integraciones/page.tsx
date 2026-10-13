@@ -64,7 +64,7 @@ export default async function Integraciones() {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="rotulo" htmlFor="firma">Firma</label>
-            <textarea id="firma" name="firma" rows={3} defaultValue={mails.firma} placeholder={'Mesa de Ayuda\nAccusys Technology'} className="campo" />
+            <textarea id="firma" name="firma" rows={3} defaultValue={mails.firma} placeholder={'Accusys Desk\nAccusys Technology'} className="campo" />
             <p className="mt-1 text-xs text-ink/45">Va al final de cada mail que manda el sistema. Vacía, se usa el nombre de la app.</p>
           </div>
           <div>

@@ -34,7 +34,7 @@ export default async function Aprobar({ params, searchParams }: { params: Promis
       <main className="mx-auto max-w-xl space-y-5">
         <div className="flex items-end gap-1.5">
           <Mark className="h-6" />
-          <span className="font-display text-lg font-extrabold leading-none tracking-tight text-brand-600">Tickets</span>
+          <span className="font-display text-lg font-extrabold leading-none tracking-tight text-brand-600">Desk</span>
         </div>
 
         {hecho ? (
@@ -45,7 +45,7 @@ export default async function Aprobar({ params, searchParams }: { params: Promis
         ) : !t ? (
           <div className="tarjeta p-6">
             <h1>Este enlace ya no sirve</h1>
-            <p className="mt-2 text-sm text-ink/65">El pedido ya fue aprobado o rechazado, o el enlace es incorrecto. Si tenés que revisarlo, ingresá a la mesa de ayuda.</p>
+            <p className="mt-2 text-sm text-ink/65">El pedido ya fue aprobado o rechazado, o el enlace es incorrecto. Si tenés que revisarlo, ingresá a Accusys Desk.</p>
           </div>
         ) : (
           <>

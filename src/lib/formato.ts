@@ -59,7 +59,7 @@ export function tamano(bytes: number) {
   return `${(bytes / 1048576).toFixed(1)} MB`
 }
 
-export const APP_NOMBRE = process.env.NEXT_PUBLIC_APP_NOMBRE || 'Mesa de Ayuda'
+export const APP_NOMBRE = process.env.NEXT_PUBLIC_APP_NOMBRE || 'Accusys Desk'
 export const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
 
 export function soloFecha(d?: string | null) {

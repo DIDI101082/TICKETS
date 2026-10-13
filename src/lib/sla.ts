@@ -8,7 +8,7 @@ import { avisarInteresados } from './notificar'
 import { APP_URL, slaRespuesta, slaResolucion } from './formato'
 import { etiquetaPrioridad, type Ticket } from './tipos'
 import { indicadores } from './metricas'
-import { duracion } from './formato'
+import { duracion, APP_NOMBRE } from './formato'
 import { revisarAccesos } from './accesos'
 
 // Minutos de anticipación con los que se avisa que un SLA está por vencer.
@@ -258,6 +258,6 @@ async function enviarReporteGeneral(mesActual: string) {
     `Detalle completo: ${APP_URL}/tablero/reportes`,
   ].join('\n')
   let enviados = 0
-  for (const mail of mails) if (await enviarEmail(mail, `Reporte de la mesa de ayuda: ${nombreMes}`, texto)) enviados++
+  for (const mail of mails) if (await enviarEmail(mail, `Reporte de ${APP_NOMBRE}: ${nombreMes}`, texto)) enviados++
   return enviados
 }

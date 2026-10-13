@@ -12,7 +12,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
             <Mark className="h-9" />
           </span>
           <span className="h-9 w-px bg-white/35" aria-hidden />
-          <span className="font-display text-[26px] font-extrabold leading-none tracking-tight">Tickets</span>
+          <span className="font-display text-[26px] font-extrabold leading-none tracking-tight">Desk</span>
         </div>
 
         <h1 className="mt-8 text-center !text-xl !text-white">Bienvenido</h1>
@@ -25,7 +25,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
         )}
         {error === 'inactiva' && (
           <p className="mt-5 rounded-lg border border-red-300/30 bg-red-500/25 px-3 py-2 text-sm text-red-100" role="alert">
-            Tu cuenta está desactivada. Si creés que es un error, hablá con el administrador de la mesa de ayuda.
+            Tu cuenta está desactivada. Si creés que es un error, hablá con el administrador de Accusys Desk.
           </p>
         )}
         {error === 'acceso' && (

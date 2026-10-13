@@ -1,6 +1,6 @@
-# Mesa de Ayuda
+# Accusys Desk
 
-Sistema de tickets para usuarios internos y clientes externos. Next.js + Supabase + Vercel, con el look and feel de Accusys Cyber.
+Mesa de ayuda de Accusys: sistema de tickets para usuarios internos y clientes externos. Next.js + Supabase + Vercel, con el look and feel de Accusys Cyber.
 
 ## Qué incluye
 

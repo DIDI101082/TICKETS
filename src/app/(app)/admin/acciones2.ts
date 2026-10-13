@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { exigirAdmin, exigirSupervisor } from '@/lib/auth'
 import { admin } from '@/lib/supabase/admin'
 import { auditar } from '@/lib/auditoria'
+import { APP_NOMBRE } from '@/lib/formato'
 import { guardarConfig, leerMantenimiento } from '@/lib/config'
 import { clasificar, iaDisponible } from '@/lib/ia'
 import { avisarTeams, enviarEmail } from '@/lib/avisos'
@@ -207,12 +208,12 @@ export async function probar(_previo: string | null, form: FormData): Promise<st
   }
   if (cual === 'mail') {
     if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) return 'Mail: faltan RESEND_API_KEY o EMAIL_FROM.'
-    const ok = await enviarEmail(perfil.email, 'Prueba de la mesa de ayuda', 'Si estás leyendo esto, el envío de mails funciona.')
+    const ok = await enviarEmail(perfil.email, `Prueba de ${APP_NOMBRE}`, 'Si estás leyendo esto, el envío de mails funciona.')
     return ok ? `Mail: enviado a ${perfil.email}. Revisá la casilla (y el spam).` : 'Mail: el servicio rechazó el envío. Revisá la clave y que el dominio del remitente esté verificado.'
   }
   if (cual === 'teams') {
     if (!process.env.TEAMS_WEBHOOK_URL) return 'Teams: falta cargar TEAMS_WEBHOOK_URL.'
-    const ok = await avisarTeams('Prueba de la mesa de ayuda', [`La envió ${perfil.nombre || perfil.email}. Si la ven, los avisos funcionan.`])
+    const ok = await avisarTeams(`Prueba de ${APP_NOMBRE}`, [`La envió ${perfil.nombre || perfil.email}. Si la ven, los avisos funcionan.`])
     return ok ? 'Teams: mensaje enviado. Revisá el canal.' : 'Teams: el flujo no aceptó el mensaje. Revisá la dirección del webhook.'
   }
   return 'Prueba desconocida.'

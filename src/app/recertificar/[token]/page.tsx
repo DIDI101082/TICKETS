@@ -34,7 +34,7 @@ export default async function Recertificar({ params, searchParams }: { params: P
       <main className="mx-auto max-w-xl space-y-5">
         <div className="flex items-end gap-1.5">
           <Mark className="h-6" />
-          <span className="font-display text-lg font-extrabold leading-none tracking-tight text-brand-600">Tickets</span>
+          <span className="font-display text-lg font-extrabold leading-none tracking-tight text-brand-600">Desk</span>
         </div>
 
         {hecho ? (

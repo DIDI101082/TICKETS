@@ -113,9 +113,9 @@ export default function Nav({
   return (
     <header className="border-b border-line/[0.06] bg-surface print:hidden">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-4 sm:gap-x-5 sm:px-6 md:flex-nowrap">
-        <Link href="/" className="flex shrink-0 items-end gap-1.5 md:pb-2" aria-label="Inicio">
+        <Link href="/" className="flex shrink-0 items-end gap-1.5 md:pb-2" aria-label="Accusys Desk: inicio">
           <Mark className="h-6" />
-          <span className="font-display text-lg font-extrabold leading-none tracking-tight text-brand-600">Tickets</span>
+          <span className="font-display text-lg font-extrabold leading-none tracking-tight text-brand-600">Desk</span>
         </Link>
 
         <div className="min-w-0 flex-1 border-line/10 max-md:order-last max-md:basis-full md:border-l md:pl-4">
