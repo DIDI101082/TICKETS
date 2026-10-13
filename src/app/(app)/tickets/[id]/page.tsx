@@ -12,6 +12,8 @@ import { cambiarVencimiento, quitarAhora } from '../../accesos/acciones'
 import { Suspense } from 'react'
 import ContextoCyber from './ContextoCyber'
 import Pasos from '@/components/Pasos'
+import Markdown from '@/components/Markdown'
+import TarjetaPhishing from './TarjetaPhishing'
 import Presencia from '@/components/Presencia'
 import { enviarAPapelera, registrarTiempo } from '../../acciones'
 import Respuesta from './Respuesta'
@@ -98,7 +100,7 @@ export default async function Detalle({ params, searchParams }: { params: Promis
     .slice(0, 5)
 
   const [rcat, rorg, rpadre, rfus, rapr] = await Promise.all([
-    t.categoria_id ? db.from('categorias').select('nombre').eq('id', t.categoria_id).maybeSingle() : Promise.resolve({ data: null }),
+    t.categoria_id ? db.from('categorias').select('nombre,consejos').eq('id', t.categoria_id).maybeSingle() : Promise.resolve({ data: null }),
     t.organizacion_id ? db.from('organizaciones').select('nombre').eq('id', t.organizacion_id).maybeSingle() : Promise.resolve({ data: null }),
     t.padre_id ? db.from('tickets').select('id,numero,asunto,estado').eq('id', t.padre_id).maybeSingle() : Promise.resolve({ data: null }),
     t.fusionado_en_id ? db.from('tickets').select('id,numero,asunto,estado').eq('id', t.fusionado_en_id).maybeSingle() : Promise.resolve({ data: null }),
@@ -190,6 +192,12 @@ export default async function Detalle({ params, searchParams }: { params: Promis
           )}
           {t.aprobacion_estado === 'pendiente' && !esAprobador && (
             <p className="text-sm text-ink/65">El pedido está esperando la aprobación de un responsable. Te avisamos apenas decida.</p>
+          )}
+          {!terminado && rcat.data?.consejos && (
+            <div className="rounded-lg bg-brand-50/70 px-3 py-2 text-sm text-ink/80">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-brand-700">Recomendaciones</p>
+              <Markdown texto={rcat.data.consejos} />
+            </div>
           )}
           {accesosTicket.filter((a) => a.ticket_id === t.id && a.estado === 'vigente').map((a) => (
             <p key={a.id} className="rounded-lg bg-brand-50/70 px-3 py-2 text-sm text-ink/80">
@@ -482,6 +490,8 @@ export default async function Detalle({ params, searchParams }: { params: Promis
                 <button className="btn-sec w-full">Tomar este ticket</button>
               </form>
             )}
+
+            <TarjetaPhishing ticketId={t.id} />
 
             {emailContexto.includes('@') && (
               <Suspense fallback={<div className="tarjeta p-4 text-sm text-ink/50">Buscando datos en Accusys Cyber…</div>}>

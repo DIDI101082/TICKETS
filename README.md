@@ -61,6 +61,12 @@ Mesa de ayuda de Accusys: sistema de tickets para usuarios internos y clientes e
 - Soporte proactivo: Accusys Cyber detecta equipos que no se conectan, disco lleno, antivirus apagado, reinicio pendiente, disco sin cifrar o amenazas de ESET, y se abre el ticket a nombre de la persona con un aviso de qué hacer. Se resuelve solo cuando el problema desaparece. Se configura en Administración → Soporte proactivo.
 - Checklists por tipo de pedido (alta, baja, cambio de área, armado de servidor): las tareas se copian a cada ticket y no se puede resolver hasta completarlas.
 
+**Seguridad para el usuario**
+- Botón "Reportar phishing" (inicio y Mi espacio): la persona sube el correo (.eml o .msg) o pega lo que vio y dice si hizo clic. Se analiza solo (SPF, DKIM, DMARC, dominios parecidos al de la empresa, enlaces engañosos, adjuntos peligrosos, urgencia), se consulta VirusTotal si está configurado y llega a Ciberseguridad con prioridad urgente si hizo clic o dio su contraseña. Avisa si otras personas reportaron el mismo remitente (campaña). La persona recibe qué hacer según lo que hizo.
+- Políticas para leer y aceptar: cada aceptación queda registrada con fecha y versión (evidencia ISO/IEC 27001); al cambiar la versión hay que aceptarla de nuevo. El administrador ve quién falta, les manda un recordatorio y exporta la evidencia a CSV.
+- Capacitaciones de seguridad (de Accusys Cyber) y resultado de los simulacros de phishing en Mi espacio.
+- Pedido "Viaje o vacaciones": VPN fuera de horario hasta la vuelta (con vencimiento automático), respuesta automática, quién te cubre y recomendaciones de seguridad para viajar. Cada categoría puede tener sus propios consejos.
+
 **Accusys Cyber en cada ticket** (opcional)
 - Ficha de quien pide: área y puesto, equipos asignados con el estado del agente (antivirus, cifrado, último reporte), detecciones de ESET, MFA, cuenta de AD (bloqueada o no) y de Microsoft 365, y licencias.
 
@@ -83,7 +89,7 @@ Mesa de ayuda de Accusys: sistema de tickets para usuarios internos y clientes e
 ### 1. Supabase
 
 1. Crear un proyecto.
-2. **SQL Editor** → ejecutar, en este orden: `supabase/schema.sql`, `002_ampliacion.sql`, `003_formularios.sql` (formularios de pedidos frecuentes, opcional), `004_portal.sql`, `005_administracion.sql`, `006_accesos_y_conocimiento.sql` y `007_checklists_y_proactivo.sql`. Todos se pueden correr más de una vez.
+2. **SQL Editor** → ejecutar, en este orden: `supabase/schema.sql`, `002_ampliacion.sql`, `003_formularios.sql` (formularios de pedidos frecuentes, opcional), `004_portal.sql`, `005_administracion.sql`, `006_accesos_y_conocimiento.sql`, `007_checklists_y_proactivo.sql` y `008_phishing_politicas_viajes.sql`. Todos se pueden correr más de una vez.
 3. **Authentication → URL Configuration**: *Site URL* con la dirección de la app y `https://TU-APP/auth/callback` en *Redirect URLs*.
 4. (Opcional) **Authentication → Providers → Azure** para el ingreso con Microsoft, y `NEXT_PUBLIC_MICROSOFT=1` en Vercel.
 
@@ -141,6 +147,16 @@ Content-Type: application/json
 - **Avisos a Teams**: URL de un flujo *Publicar en un canal cuando se recibe una solicitud de webhook* en `TEAMS_WEBHOOK_URL`.
 - **Avisos por mail**: `RESEND_API_KEY` y `EMAIL_FROM`. Cada persona elige en "Mi cuenta" si quiere mail por cada novedad, solo al resolverse o ninguno.
 - **Avisos por Teams a cada persona**: `TEAMS_USUARIO_WEBHOOK_URL` con la dirección de un flujo *Cuando se recibe una solicitud HTTP* → *Publicar mensaje en un chat o canal* (Flow bot, destinatario = `email`). El flujo recibe `{ email, titulo, texto, url }`.
+
+### Reportes de phishing por mail
+
+Si tienen una casilla para reenviar correos sospechosos (por ejemplo phishing@), un flujo de Power Automate la manda al mismo webhook con `"tipo": "phishing"`. Lo ideal es reenviar el correo como adjunto y pasar ese adjunto en `eml_base64`:
+
+```
+{ "tipo": "phishing", "de": "quien-reporta@empresa.com", "asunto": "...", "cuerpo": "...", "eml_base64": "<contenido del adjunto .eml>" }
+```
+
+Variables opcionales: `VIRUSTOTAL_API_KEY` (consulta la reputación de hasta 4 enlaces o adjuntos por reporte; solo busca, no sube archivos), `PHISHING_DOMINIOS` (dominios propios separados por coma; por defecto `accusys.com.ar,accusystechnology.com`) y `NEXT_PUBLIC_CAPACITACIONES_URL` (dónde se hacen las capacitaciones, para el enlace de Mi espacio).
 
 ## Monitoreo (PRTG)
 

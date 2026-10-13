@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { admin } from '@/lib/supabase/admin'
 import { crearTicket, limpiarRespuesta } from '@/lib/tickets'
+import { crearReportePhishing, esClic } from '@/lib/phishing'
 
 /**
  * Entrada de tickets desde fuera del portal (email o Teams).
@@ -11,6 +12,11 @@ import { crearTicket, limpiarRespuesta } from '@/lib/tickets'
  * { "canal": "email" | "teams", "de": "persona@dominio.com", "nombre": "Nombre", "asunto": "...", "cuerpo": "..." }
  *
  * Si el asunto trae [#1234] y quien escribe es el solicitante de ese ticket, se agrega como respuesta.
+ *
+ * Reporte de phishing (p. ej. un buzón phishing@ o el botón "Reportar" de Outlook reenviado por Power Automate):
+ * { "tipo": "phishing", "de": "quien reporta", "asunto": "...", "cuerpo": "...",
+ *   "eml_base64": "<el correo original como adjunto .eml, en base64>"  (opcional; o "eml" en texto),
+ *   "hizo_clic": "no" | "clic" | "contrasena" | "adjunto" (opcional) }
  */
 
 function autorizado(request: NextRequest) {
@@ -48,6 +54,24 @@ export async function POST(request: NextRequest) {
   const db = admin()
   const { data: perfil } = await db.from('perfiles').select('id,nombre').ilike('email', email).maybeSingle()
   const nombre = texto(b.nombre) || perfil?.nombre || email.split('@')[0]
+
+  if (b.tipo === 'phishing') {
+    const crudoEml = texto(b.eml) || (texto(b.eml_base64) ? Buffer.from(texto(b.eml_base64), 'base64').toString('latin1') : '')
+    const archivo = crudoEml ? new File([Buffer.from(crudoEml, 'latin1')], 'correo-reportado.eml', { type: 'message/rfc822' }) : null
+    const { ticket } = await crearReportePhishing({
+      solicitanteId: perfil?.id ?? null,
+      email,
+      nombre,
+      canal,
+      // Si no vino el .eml, el reenvío trae el correo sospechoso en el cuerpo
+      asunto: asunto.replace(/^((re|rv|fw|fwd):\s*)+/i, ''),
+      texto: crudoEml ? '' : cuerpo,
+      comentario: crudoEml ? cuerpo.slice(0, 2000) : 'Reportado por correo.',
+      hizoClic: esClic(b.hizo_clic) ? b.hizo_clic : 'no',
+      archivo,
+    })
+    return NextResponse.json({ ticket: ticket.numero, accion: 'phishing' })
+  }
 
   const ref = asunto.match(/\[#(\d+)\]/)
   if (ref) {

@@ -4,6 +4,7 @@ import { contextoDe, cyberConfigurado, type EquipoCyber } from '@/lib/cyber'
 import { fecha, soloFecha } from '@/lib/formato'
 import { InsigniaEstado } from '@/components/Insignias'
 import type { Acceso, Categoria, Ticket } from '@/lib/tipos'
+import { politicasDe } from '@/lib/politicas'
 import { yaNoLoNecesito } from './acciones'
 
 // "Mi espacio": lo que la empresa le asignó a la persona (equipos, accesos, licencias, cuenta)
@@ -45,14 +46,23 @@ export default async function MiEspacio({ searchParams }: { searchParams: Promis
   const catModif = cat(/modificaci[oó]n de usuario/i)
   const pedir = (c?: { id: string }, extra = '') => (c ? `/portal/nuevo?cat=${c.id}${extra}` : '/portal/nuevo')
 
-  const cyber = cyberConfigurado() ? await contextoDe(perfil.email, 'mi-espacio') : null
+  const [cyber, pol] = await Promise.all([
+    cyberConfigurado() ? contextoDe(perfil.email, 'mi-espacio') : Promise.resolve(null),
+    politicasDe(db, perfil),
+  ])
   const d = cyber?.datos
+  const capacitaciones = d?.capacitaciones ?? []
+  const capPendientes = capacitaciones.filter((c) => c.estado !== 'al_dia')
+  const urlCapacitaciones = process.env.NEXT_PUBLIC_CAPACITACIONES_URL || ''
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1>Mi espacio</h1>
-        <p className="text-sm text-ink/60">Tus equipos, accesos y licencias. Desde cada uno podés pedir ayuda con un clic.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1>Mi espacio</h1>
+          <p className="text-sm text-ink/60">Tus equipos, accesos, licencias, políticas y capacitaciones. Desde cada uno podés pedir ayuda con un clic.</p>
+        </div>
+        <Link href="/portal/phishing" className="btn-sec border-red-300 text-red-700 hover:bg-red-50">⚠ Reportar phishing</Link>
       </div>
       {ok === 'acceso' && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">Listo: pedimos quitar ese acceso. Lo vas a ver como “Se está quitando”.</p>}
 
@@ -165,6 +175,70 @@ export default async function MiEspacio({ searchParams }: { searchParams: Promis
             </>
           )}
         </section>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        {(pol.lista.length > 0 || pol.error == null) && (
+          <section className="space-y-3">
+            <h2>Políticas</h2>
+            {pol.lista.length === 0 ? (
+              <p className="tarjeta p-4 text-sm text-ink/60">No hay políticas publicadas para leer.</p>
+            ) : (
+              <div className="tarjeta space-y-2 p-4 text-sm">
+                {pol.pendientes.length > 0 ? (
+                  <>
+                    <p className="font-medium text-amber-800">Tenés {pol.pendientes.length === 1 ? 'una para leer y aceptar' : `${pol.pendientes.length} para leer y aceptar`}:</p>
+                    <ul className="list-disc space-y-0.5 pl-5">
+                      {pol.pendientes.map((p) => (
+                        <li key={p.id}><Link href={`/politicas/${p.id}`} className="text-brand-600 hover:underline">{p.titulo}</Link>{p.aceptoAnterior ? <span className="text-xs text-ink/50"> (versión nueva)</span> : null}</li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p className="text-emerald-700">✓ Aceptaste todas las políticas vigentes.</p>
+                )}
+                <Link href="/politicas" className="inline-block text-brand-600 hover:underline">Ver todas</Link>
+              </div>
+            )}
+          </section>
+        )}
+
+        {(capacitaciones.length > 0 || d?.simulaciones) && (
+          <section className="space-y-3">
+            <h2>Mis capacitaciones de seguridad</h2>
+            <div className="tarjeta space-y-3 p-4 text-sm">
+              {capacitaciones.length > 0 && (
+                <ul className="divide-y divide-line/[0.06]">
+                  {capacitaciones.map((c) => (
+                    <li key={c.nombre} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                      <span>{c.nombre}</span>
+                      <Estado
+                        ok={c.estado === 'al_dia'}
+                        texto={c.estado === 'al_dia' ? `Al día${c.vence ? ` hasta el ${soloFecha(c.vence)}` : ''}` : c.estado === 'vencida' ? `Vencida${c.vence ? ` el ${soloFecha(c.vence)}` : ''}` : 'Pendiente'}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {capPendientes.length > 0 && (
+                <p className="text-ink/70">
+                  {urlCapacitaciones
+                    ? <><a href={urlCapacitaciones} target="_blank" rel="noopener" className="text-brand-600 underline">Hacelas acá</a>. </>
+                    : 'Ciberseguridad te va a mandar la invitación para hacerlas. '}
+                  Si ya las hiciste, puede tardar unos días en reflejarse.
+                </p>
+              )}
+              {d?.simulaciones && (
+                <p className="rounded-lg bg-brand-50/70 px-3 py-2 text-ink/80">
+                  Simulacros de phishing: recibiste {d.simulaciones.recibidas}
+                  {d.simulaciones.reporto > 0 ? `, reportaste ${d.simulaciones.reporto}` : ''}
+                  {d.simulaciones.clic > 0 ? ` y en ${d.simulaciones.clic} hiciste clic` : ''}.
+                  {d.simulaciones.clic > 0 ? ' Ante la duda, usá el botón “Reportar phishing”: es la mejor defensa.' : d.simulaciones.reporto > 0 ? ' ¡Muy bien!' : ''}
+                </p>
+              )}
+            </div>
+          </section>
+        )}
       </div>
 
       {d && <p className="text-xs text-ink/45">Datos de equipos, licencias y cuenta tomados del inventario de la empresa. Si algo no coincide, avisanos con un pedido.</p>}

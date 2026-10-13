@@ -53,6 +53,11 @@ function Formulario({ c, sectores, orden, mailDe }: { c?: Categoria; sectores: S
         <textarea name="tareas" rows={3} defaultValue={(c?.tareas ?? []).join('\n')} className="campo text-[13px]" placeholder={'Deshabilitar la cuenta\n[Ciberseguridad] Quitar accesos a VPN y AWS\nRecuperar el equipo'} />
         <p className="mt-1 text-xs text-ink/45">Se copian a cada ticket nuevo de esta categoría y no se puede resolver hasta completarlas (o marcarlas como “no aplica”). Entre corchetes, el sector que la hace.</p>
       </div>
+      <div>
+        <label className="rotulo">Consejos para quien pide</label>
+        <textarea name="consejos" rows={2} defaultValue={c?.consejos ?? ''} className="campo text-[13px]" placeholder="Ej.: Antes de viajar, actualizá la notebook y no te conectes a redes Wi-Fi abiertas sin la VPN." />
+        <p className="mt-1 text-xs text-ink/45">Se muestran al elegir la categoría y en el pedido, mientras está abierto. Admite **negrita**, listas con guion y [enlaces](https://…).</p>
+      </div>
       <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
         <div>
           <label className="rotulo">Quién aprueba (mails, en orden)</label>
@@ -72,6 +77,10 @@ function Formulario({ c, sectores, orden, mailDe }: { c?: Categoria; sectores: S
         </label>
         <label className="flex items-center gap-1.5" title="Al resolverse, el acceso queda registrado y se controla su vencimiento">
           <input type="checkbox" name="es_acceso" defaultChecked={c?.es_acceso} className="accent-brand-600" /> Otorga un acceso
+        </label>
+        <label className="flex items-center gap-1.5" title="Cómo se llama el acceso en el registro. Vacío: el nombre de la categoría">
+          Nombre del acceso
+          <input name="acceso_nombre" defaultValue={c?.acceso_nombre ?? ''} className="campo w-48 py-1" placeholder="Ej.: VPN fuera de horario" />
         </label>
         <label className="flex items-center gap-1.5" title="Se usa si el pedido no trae una fecha de fin válida. Vacío: sin límite">
           Vence a los

@@ -31,6 +31,8 @@ export interface ContextoCyber {
   mfa?: { activo: boolean; metodos: string[]; admin: boolean; actualizado: string }
   ad?: { usuario: string; habilitada: boolean | null; bloqueada: boolean | null; ultimo_ingreso: string | null; clave_cambiada: string | null; clave_no_vence: boolean | null }
   m365?: { habilitada: boolean; ultimo_ingreso: string | null }
+  capacitaciones?: { nombre: string; estado: 'pendiente' | 'vencida' | 'al_dia'; ultima: string | null; vence: string | null }[]
+  simulaciones?: { recibidas: number; reporto: number; clic: number }
 }
 
 export const cyberConfigurado = () =>

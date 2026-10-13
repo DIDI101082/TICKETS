@@ -73,9 +73,10 @@ export default function Nav({
         {
           href: '/kb',
           label: 'Conocimiento',
-          tambien: ['/plantillas', '/estado'],
+          tambien: ['/plantillas', '/estado', '/politicas'],
           paginas: [
             { href: '/kb', label: 'Artículos' },
+            { href: '/politicas', label: 'Políticas' },
             { href: '/plantillas', label: 'Respuestas predefinidas' },
             { href: '/estado', label: 'Estado de servicios' },
           ],
@@ -93,6 +94,7 @@ export default function Nav({
                   { href: '/admin/reglas', label: 'Reglas' },
                   { href: '/admin/programados', label: 'Programados' },
                   { href: '/admin/proactivo', label: 'Soporte proactivo' },
+                  { href: '/admin/politicas', label: 'Políticas' },
                   { href: '/admin/integraciones', label: 'Integraciones' },
                   { href: '/admin/datos', label: 'Datos' },
                   { href: '/admin/auditoria', label: 'Auditoría' },
@@ -103,7 +105,7 @@ export default function Nav({
       ]
     : [
         { href: '/portal', label: 'Inicio', tambien: ['/tickets'] },
-        { href: '/mi-espacio', label: 'Mi espacio' },
+        { href: '/mi-espacio', label: 'Mi espacio', tambien: ['/politicas'] },
         { href: '/kb', label: 'Ayuda' },
         { href: '/estado', label: 'Estado de servicios' },
       ]

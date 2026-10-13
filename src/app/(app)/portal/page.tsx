@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { sesion } from '@/lib/auth'
+import { cuantasPendientes } from '@/lib/politicas'
 import { fecha } from '@/lib/formato'
 import { InsigniaEstado } from '@/components/Insignias'
 import { ACTIVOS, ESTADOS, type Categoria, type Servicio, type Ticket } from '@/lib/tipos'
@@ -19,6 +20,7 @@ export default async function Portal({ searchParams }: { searchParams: Promise<{
     db.from('tickets').select('id', { count: 'exact', head: true }).like('clave_externa', 'proactivo:%').eq('solicitante_id', perfil.id).in('estado', ['abierto', 'en_curso', 'en_espera']),
   ])
   const detectados = rdet.count ?? 0
+  const politicasPendientes = await cuantasPendientes(db, perfil)
   const pendientes = rpend.count ?? 0
   const conProblemas = (rserv.data ?? []) as Servicio[]
   const uso = new Map<string, number>()
@@ -63,12 +65,23 @@ export default async function Portal({ searchParams }: { searchParams: Promise<{
           <strong>Detectamos {detectados === 1 ? 'algo' : `${detectados} cosas`} en tus equipos.</strong> Mirá qué es y qué podés hacer →
         </Link>
       )}
+      {politicasPendientes > 0 && (
+        <Link href="/politicas" className="block rounded-xl border border-brand-500 bg-brand-50 px-4 py-3 text-sm text-brand-700">
+          <strong>Tenés {politicasPendientes === 1 ? 'una política' : `${politicasPendientes} políticas`} para leer y aceptar.</strong> Te lleva unos minutos →
+        </Link>
+      )}
       <section className="rounded-2xl bg-[#0A2A6E] bg-[linear-gradient(135deg,#0A2466_0%,#0B3A9E_55%,#1449C8_100%)] px-6 py-8 text-white">
         <h1 className="!text-white">{nombre ? `Hola, ${nombre}` : 'Hola'}. ¿En qué te ayudamos?</h1>
         <form action="/kb" className="mt-4 flex max-w-2xl gap-2">
           <input name="q" placeholder="Buscá en la ayuda: VPN, contraseña, impresora…" aria-label="Buscar en la ayuda" className="block w-full rounded-xl border-0 bg-white px-4 py-3 text-sm text-[#1F2937] outline-none placeholder:text-[#1F2937]/45 focus:ring-2 focus:ring-white/60" />
           <button className="shrink-0 rounded-xl border border-white/40 bg-white/15 px-4 text-sm font-medium hover:bg-white/25">Buscar</button>
         </form>
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          <Link href="/portal/phishing" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 font-semibold text-[#B42318] shadow-sm hover:bg-red-50">
+            <span aria-hidden>⚠</span> Reportar phishing
+          </Link>
+          <span className="text-white/75">¿Te llegó un correo sospechoso? Reportalo antes de hacer clic.</span>
+        </div>
       </section>
 
       {conProblemas.length > 0 && (

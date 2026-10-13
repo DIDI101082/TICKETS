@@ -1,5 +1,6 @@
 'use client'
 
+import Markdown from '@/components/Markdown'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useFormStatus } from 'react-dom'
 import Link from 'next/link'
@@ -134,6 +135,12 @@ export default function Formulario({ categorias, inicial, enNombre = false }: { 
           {categoria?.descripcion && <p className="mt-1 text-xs text-ink/50">{categoria.descripcion}</p>}
           {categoria?.requiere_aprobacion && <p className="mt-1 text-xs text-amber-700">Este tipo de pedido necesita la aprobación de un responsable antes de ejecutarse.</p>}
           {categoria?.confidencial && <p className="mt-1 text-xs text-ink/50">Es confidencial: solo lo ven las personas que lo atienden.</p>}
+          {categoria?.consejos && (
+            <div className="mt-2 rounded-lg bg-brand-50/70 px-3 py-2 text-sm text-ink/80">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-brand-700">Antes de enviar</p>
+              <Markdown texto={categoria.consejos} />
+            </div>
+          )}
         </div>
       )}
 

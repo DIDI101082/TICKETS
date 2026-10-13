@@ -81,6 +81,8 @@ export interface Categoria {
   acceso_dias_max?: number | null
   recertificar_dias?: number
   tareas?: string[]
+  consejos?: string | null
+  acceso_nombre?: string | null
 }
 
 export interface TicketTarea {
