@@ -12,20 +12,20 @@ import { quitarAccesoEquipo, recordarPoliticas, sigueHaciendoFalta } from './acc
 // "Mi equipo": para quien tiene gente a cargo (jefe directo en Personas).
 // Accesos de su gente, qué falta reconfirmar, políticas y capacitaciones pendientes, y pedidos de alta, baja o cambio en un clic.
 
-interface Persona { id: string; nombre: string; email: string; tipo: 'interno' | 'externo' }
+interface Persona { id: string; nombre: string; email: string; tipo: 'interno' | 'externo'; area: string; puesto: string }
 
 export default async function MiEquipo({ searchParams }: { searchParams: Promise<{ ok?: string; recordados?: string }> }) {
   const sp = await searchParams
   const { db, perfil } = await sesion()
   const sa = admin()
-  const { data: rg } = await sa.from('perfiles').select('id,nombre,email,tipo').eq('jefe_id', perfil.id).eq('activo', true).order('nombre')
+  const { data: rg } = await sa.from('perfiles').select('id,nombre,email,tipo,area,puesto').eq('jefe_id', perfil.id).eq('activo', true).order('nombre')
   const gente = (rg ?? []) as Persona[]
 
   if (!gente.length) {
     return (
       <div className="mx-auto max-w-2xl space-y-3">
         <h1>Mi equipo</h1>
-        <p className="tarjeta p-6 text-sm text-ink/60">No figura nadie a tu cargo. Si tenés gente a cargo, pedile a un administrador que te cargue como su jefe en Personas.</p>
+        <p className="tarjeta p-6 text-sm text-ink/60">No figura nadie a tu cargo. El jefe de cada persona se toma de Microsoft 365 (Entra ID) o lo carga un administrador en Personas.</p>
       </div>
     )
   }
@@ -94,7 +94,7 @@ export default async function MiEquipo({ searchParams }: { searchParams: Promise
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-medium">{g.nombre || g.email}</p>
-                  <p className="text-xs text-ink/50">{g.email}</p>
+                  <p className="text-xs text-ink/50">{[g.puesto, g.area].filter(Boolean).join(' · ') || g.email}</p>
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
                   <Link href={pedir(/modificaci[oó]n de usuario/i, g)} className="text-brand-600 hover:underline">Pedir un permiso o programa</Link>
@@ -144,7 +144,7 @@ export default async function MiEquipo({ searchParams }: { searchParams: Promise
           )
         })}
       </ul>
-      <p className="text-xs text-ink/45">Ves a las personas que te tienen como jefe en Desk. Si falta alguien o sobra, avisale a un administrador.</p>
+      <p className="text-xs text-ink/45">Ves a las personas que te tienen como jefe (según Microsoft 365 o lo cargado en Personas) y que ya entraron a Desk al menos una vez.</p>
     </div>
   )
 }

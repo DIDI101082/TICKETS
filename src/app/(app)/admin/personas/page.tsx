@@ -84,6 +84,11 @@ export default async function Personas({ searchParams }: { searchParams: Promise
                   Jefe (mail)
                   <input name="jefe" type="email" defaultValue={u.jefe_id ? mailDe.get(u.jefe_id) ?? '' : ''} placeholder="jefe@empresa.com" className="campo w-56 py-1" />
                 </label>
+                {u.entra_id && (
+                  <span className="text-xs text-ink/50" title="Nombre, área, puesto y jefe se actualizan desde Microsoft 365">
+                    Entra ID{u.puesto || u.area ? ` · ${[u.puesto, u.area].filter(Boolean).join(' · ')}` : ''}
+                  </span>
+                )}
                 {u.rol !== 'usuario' && (
                   <>
                     <label className="flex items-center gap-1.5">

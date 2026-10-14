@@ -3,8 +3,10 @@ import { leerConfig, leerMails, leerReporte } from '@/lib/config'
 import { fecha } from '@/lib/formato'
 import { guardarMails } from '../acciones2'
 import Pruebas from './Pruebas'
+import Entra from './Entra'
 
-export default async function Integraciones() {
+export default async function Integraciones({ searchParams }: { searchParams: Promise<{ entra?: string }> }) {
+  const sp = await searchParams
   await exigirAdmin()
   const [mails, reporte, revision] = await Promise.all([leerMails(), leerReporte(), leerConfig<{ en: string }>('ultima_revision', { en: '' })])
   const e = process.env
@@ -16,8 +18,9 @@ export default async function Integraciones() {
     { nombre: 'Entrada por email y Teams', ok: (e.ENTRADA_SECRET ?? '').length >= 12, detalle: (e.ENTRADA_SECRET ?? '').length >= 12 ? 'Clave cargada' : 'Falta ENTRADA_SECRET (12 caracteres o más)' },
     { nombre: 'Monitoreo (PRTG)', ok: (e.MONITOREO_SECRET ?? '').length >= 12, detalle: (e.MONITOREO_SECRET ?? '').length >= 12 ? `Sector: ${e.MONITOREO_SECTOR || 'Infraestructura'}` : 'Falta MONITOREO_SECRET (12 caracteres o más)' },
     { nombre: 'Contadores para otra app', ok: (e.RESUMEN_API_KEY ?? '').length >= 12, detalle: (e.RESUMEN_API_KEY ?? '').length >= 12 ? 'Clave cargada' : 'Falta RESUMEN_API_KEY' },
+    { nombre: 'Personas desde Entra ID', ok: !!(e.AZURE_TENANT_ID && e.AZURE_CLIENT_ID && e.AZURE_CLIENT_SECRET), detalle: e.AZURE_TENANT_ID && e.AZURE_CLIENT_ID && e.AZURE_CLIENT_SECRET ? 'Credenciales cargadas (ver abajo)' : 'Faltan AZURE_TENANT_ID, AZURE_CLIENT_ID y AZURE_CLIENT_SECRET' },
     { nombre: 'Ingreso con Microsoft', ok: e.NEXT_PUBLIC_MICROSOFT === '1', detalle: e.NEXT_PUBLIC_MICROSOFT === '1' ? 'Botón visible (requiere Azure activo en Supabase)' : 'NEXT_PUBLIC_MICROSOFT no está en 1' },
-    { nombre: 'Tarea diaria programada', ok: !!e.CRON_SECRET, detalle: e.CRON_SECRET ? 'Clave cargada' : 'Falta CRON_SECRET' },
+    { nombre: 'Tarea programada (cada hora)', ok: !!e.CRON_SECRET, detalle: e.CRON_SECRET ? 'Clave cargada' : 'Falta CRON_SECRET' },
   ]
 
   return (
@@ -52,6 +55,8 @@ export default async function Integraciones() {
           Última revisión automática (avisos de SLA, escalamiento, programados y mantenimiento): <strong className="text-ink">{revision.en ? fecha(revision.en) : 'todavía no corrió'}</strong>
         </p>
       </div>
+
+      <Entra aviso={sp.entra} />
 
       <section className="tarjeta space-y-3 p-4">
         <h2>Probar</h2>

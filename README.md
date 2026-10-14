@@ -94,7 +94,7 @@ Mesa de ayuda de Accusys: sistema de tickets para usuarios internos y clientes e
 ### 1. Supabase
 
 1. Crear un proyecto.
-2. **SQL Editor** → ejecutar, en este orden: `supabase/schema.sql`, `002_ampliacion.sql`, `003_formularios.sql` (formularios de pedidos frecuentes, opcional), `004_portal.sql`, `005_administracion.sql`, `006_accesos_y_conocimiento.sql`, `007_checklists_y_proactivo.sql`, `008_phishing_politicas_viajes.sql` y `009_diagnostico_turnos_equipo.sql`. Todos se pueden correr más de una vez.
+2. **SQL Editor** → ejecutar, en este orden: `supabase/schema.sql`, `002_ampliacion.sql`, `003_formularios.sql` (formularios de pedidos frecuentes, opcional), `004_portal.sql`, `005_administracion.sql`, `006_accesos_y_conocimiento.sql`, `007_checklists_y_proactivo.sql`, `008_phishing_politicas_viajes.sql`, `009_diagnostico_turnos_equipo.sql` y `010_entra_id.sql`. Todos se pueden correr más de una vez.
 3. **Authentication → URL Configuration**: *Site URL* con la dirección de la app y `https://TU-APP/auth/callback` en *Redirect URLs*.
 4. (Opcional) **Authentication → Providers → Azure** para el ingreso con Microsoft, y `NEXT_PUBLIC_MICROSOFT=1` en Vercel.
 
@@ -110,6 +110,11 @@ Subir el contenido de esta carpeta a un repo, importarlo en Vercel y cargar las 
 
 1. En el SQL Editor de **Accusys Cyber** ejecutar `tickets-contexto.sql` y `tickets-proactivo.sql` (están en el repo de Accusys Cyber) y después `select public.tickets_nuevo_token();`.
 2. En Vercel de esta app cargar `CYBER_SUPABASE_URL` y `CYBER_SUPABASE_ANON_KEY` (los de Accusys Cyber), `CYBER_CONTEXTO_TOKEN` (la clave del paso 1, como Secret) y `NEXT_PUBLIC_CYBER_URL`.
+
+### Entra ID (opcional)
+
+- **Personas:** en Vercel cargar `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` y `AZURE_CLIENT_SECRET` (Secret) de una app de Entra con el permiso de aplicación `User.Read.All` y consentimiento de administrador. Opcional `ENTRA_DOMINIOS`. Se activa en Administración → Integraciones → Personas desde Entra ID: nombre, área, puesto y jefe se actualizan cada hora, y las cuentas deshabilitadas en Entra se desactivan (nunca un administrador).
+- **Ingreso con Microsoft:** en Supabase → Authentication → Providers → Azure, con el Client ID y un secreto de la app de Entra y la URL del tenant (`https://login.microsoftonline.com/<tenant-id>`). En la app de Entra, URI de redirección `https://<proyecto>.supabase.co/auth/v1/callback`. En Vercel, `NEXT_PUBLIC_MICROSOFT=1`.
 
 ### Actualizar una instalación existente
 

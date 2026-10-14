@@ -38,6 +38,9 @@ export interface Perfil {
   supervisor: boolean
   ausente_hasta: string | null
   jefe_id: string | null
+  area?: string
+  puesto?: string
+  entra_id?: string | null
 }
 
 export interface Sector {
