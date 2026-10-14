@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { sesion } from '@/lib/auth'
 import { admin } from '@/lib/supabase/admin'
-import { asistir } from '@/lib/ia'
+import { asistir, iaDisponible, recomendarAntes, type Recomendacion } from '@/lib/ia'
 import { claves, coincidencias } from '@/lib/texto'
 import { archivosDe, crearTicket, registrarEvento, subirAdjuntos } from '@/lib/tickets'
 import { IMPACTOS, URGENCIAS, type Categoria, type Dato } from '@/lib/tipos'
@@ -72,36 +72,72 @@ export async function crear(form: FormData) {
   })
   if (enNombre) await registrarEvento(t.id, perfil.nombre, `Cargado por ${perfil.nombre || perfil.email} en nombre de ${solicitante.nombre || solicitante.email}`)
   // Si antes vio el diagnóstico, se deja como nota interna para quien lo atienda.
-  const autoId = String(form.get('autoservicio_id') || '')
-  if (autoId && !enNombre) {
-    const { data: auto } = await admin().from('autoservicio').select('id,hallazgos').eq('id', autoId).eq('perfil_id', perfil.id).maybeSingle()
-    if (auto) {
-      await admin().from('autoservicio').update({ resultado: 'ticket', ticket_id: t.id, actualizado_en: new Date().toISOString() }).eq('id', auto.id)
-      await admin().from('mensajes').insert({ ticket_id: t.id, autor_id: null, autor_nombre: 'Diagnóstico automático', de_staff: true, interno: true, cuerpo: resumenDiagnostico(auto.hallazgos as Hallazgo[]) })
-    }
+  for (const campo of ['autoservicio_id', 'asistente_id']) {
+    const autoId = String(form.get(campo) || '')
+    if (!autoId || enNombre) continue
+    const { data: auto } = await admin().from('autoservicio').select('id,tipo,hallazgos').eq('id', autoId).eq('perfil_id', perfil.id).maybeSingle()
+    if (!auto) continue
+    await admin().from('autoservicio').update({ resultado: 'ticket', ticket_id: t.id, actualizado_en: new Date().toISOString() }).eq('id', auto.id)
+    const items = (auto.hallazgos ?? []) as { id: string; titulo: string }[]
+    const cuerpo = auto.tipo === 'ia'
+      ? ['Antes de enviar, la IA le sugirió revisar (y siguió con el pedido):', ...items.map((x) => (x.id === 'ia:resumen' ? `Parece: ${x.titulo}` : `- ${x.titulo}`))].join('\n')
+      : resumenDiagnostico(items as Hallazgo[])
+    await admin().from('mensajes').insert({ ticket_id: t.id, autor_id: null, autor_nombre: auto.tipo === 'ia' ? 'Asistente' : 'Diagnóstico automático', de_staff: true, interno: true, cuerpo })
   }
   await subirAdjuntos(t.id, null, archivosDe(form))
   redirect(`/tickets/${t.id}`)
 }
 
-/** Busca una solución en la base de conocimiento antes de cargar el ticket. */
-export async function asistente(asunto: string, descripcion: string): Promise<{ respuesta?: string; articulos: { id: string; titulo: string }[] }> {
-  const { db } = await sesion()
+export interface Ayuda {
+  respuesta?: string
+  recomendacion?: Recomendacion
+  articulos: { id: string; titulo: string }[]
+  id?: string
+}
+
+/**
+ * "¿Qué reviso antes de enviarlo?": busca en la base de conocimiento y, si la IA está configurada,
+ * arma recomendaciones con los artículos y lo que encontró la revisión del equipo.
+ */
+export async function asistente(asunto: string, descripcion: string, categoriaId = '', diagnosticoId = ''): Promise<Ayuda> {
+  const { db, perfil } = await sesion()
   const consulta = `${asunto}\n${descripcion}`.slice(0, 3000)
   const mias = claves(consulta)
-  if (mias.length < 2) return { articulos: [] }
 
   // La seguridad por fila limita los artículos a los que esta persona puede ver.
-  const { data } = await db.from('articulos').select('id,titulo,contenido').eq('publicado', true).limit(300)
+  const { data } = mias.length ? await db.from('articulos').select('id,titulo,contenido').eq('publicado', true).limit(300) : { data: [] }
   const utiles = (data ?? [])
     .map((a) => ({ id: a.id as string, titulo: a.titulo as string, contenido: a.contenido as string, puntos: coincidencias(mias, claves(a.titulo)) * 3 + coincidencias(mias, claves(a.contenido)) }))
     .filter((a) => a.puntos >= 3)
     .sort((a, b) => b.puntos - a.puntos)
     .slice(0, 3)
-  if (!utiles.length) return { articulos: [] }
 
-  const respuesta = await asistir(consulta, utiles)
-  return { respuesta: respuesta ?? undefined, articulos: utiles.map(({ id, titulo }) => ({ id, titulo })) }
+  if (!iaDisponible()) return { articulos: utiles.map(({ id, titulo }) => ({ id, titulo })) }
+
+  const [{ data: cat }, { data: diag }] = await Promise.all([
+    categoriaId ? db.from('categorias').select('nombre').eq('id', categoriaId).maybeSingle() : Promise.resolve({ data: null }),
+    diagnosticoId ? admin().from('autoservicio').select('hallazgos').eq('id', diagnosticoId).eq('perfil_id', perfil.id).maybeSingle() : Promise.resolve({ data: null }),
+  ])
+  const hallazgos = ((diag?.hallazgos ?? []) as { titulo: string }[]).map((h) => h.titulo).slice(0, 8)
+  const rec = await recomendarAntes({ asunto, descripcion, categoria: cat?.nombre ?? '', hallazgos, articulos: utiles })
+  if (!rec) {
+    // Si la IA no respondió, queda la respuesta basada solo en artículos (como antes)
+    const respuesta = utiles.length ? await asistir(consulta, utiles) : null
+    return { respuesta: respuesta ?? undefined, articulos: utiles.map(({ id, titulo }) => ({ id, titulo })) }
+  }
+  const usados = rec.articulos.length ? rec.articulos.map((n) => utiles[n - 1]).filter(Boolean) : utiles
+  // Queda registrado para medir cuántos pedidos se resuelven sin ticket
+  const { data: fila } = await admin()
+    .from('autoservicio')
+    .insert({
+      perfil_id: perfil.id,
+      categoria_id: categoriaId || null,
+      tipo: 'ia',
+      hallazgos: [{ id: 'ia:resumen', titulo: rec.resumen }, ...rec.pasos.map((p, i) => ({ id: `ia:paso${i}`, titulo: p }))],
+    })
+    .select('id')
+    .single()
+  return { recomendacion: rec, articulos: usados.map(({ id, titulo }) => ({ id, titulo })), id: fila?.id }
 }
 
 /** ¿Estamos fuera del horario laboral? (para el diagnóstico de VPN) */

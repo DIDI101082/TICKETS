@@ -29,7 +29,7 @@ export default async function Proactivo({ searchParams }: { searchParams: Promis
     const k = h.id.split(':')[0]
     causas.set(k, (causas.get(k) ?? 0) + 1)
   }
-  const CAUSA: Record<string, string> = { uptime: 'Sin reiniciar hace días', reinicio: 'Reinicio pendiente', disco: 'Disco casi lleno', ram: 'Memoria llena', parches: 'Windows sin actualizar', eset: 'Amenaza del antivirus', av: 'Antivirus apagado', forti: 'FortiClient desactualizado', ad: 'Cuenta (bloqueo o contraseña)', m365: 'Microsoft 365 deshabilitada', mfa: 'Sin verificación en dos pasos', acceso: 'Permiso de VPN vencido o faltante', sinreporte: 'Equipo sin reportar' }
+  const CAUSA: Record<string, string> = { uptime: 'Sin reiniciar hace días', reinicio: 'Reinicio pendiente', disco: 'Disco casi lleno', ram: 'Memoria llena', parches: 'Windows sin actualizar', eset: 'Amenaza del antivirus', av: 'Antivirus apagado', forti: 'FortiClient desactualizado', ad: 'Cuenta (bloqueo o contraseña)', m365: 'Microsoft 365 deshabilitada', mfa: 'Sin verificación en dos pasos', acceso: 'Permiso de VPN vencido o faltante', sinreporte: 'Equipo sin reportar', ia: 'Sugerencias de la IA' }
 
   return (
     <div className="space-y-6">

@@ -11,17 +11,53 @@ export interface Clasificacion {
 
 const PRIORIDADES_VALIDAS = ['baja', 'media', 'alta', 'urgente']
 
-export const iaDisponible = () => !!process.env.ANTHROPIC_API_KEY
+// Dos formas de conectar la IA:
+//  * Anthropic (Claude): ANTHROPIC_API_KEY (y opcional AI_BASE_URL para pasar por un proxy como LiteLLM).
+//  * Cualquier API compatible con OpenAI, incluidas las gratuitas: AI_API_KEY + AI_BASE_URL + AI_MODEL.
+//    Ej. Groq (gratis): AI_BASE_URL=https://api.groq.com/openai/v1  AI_MODEL=llama-3.3-70b-versatile
+//    Ej. Ollama o LiteLLM propios: AI_BASE_URL=https://ia.empresa.com/v1
+const modoOpenAI = () => !!process.env.AI_API_KEY && !process.env.ANTHROPIC_API_KEY
+
+export const iaDisponible = () => !!(process.env.ANTHROPIC_API_KEY || (process.env.AI_API_KEY && process.env.AI_BASE_URL))
+
+export function iaDescripcion() {
+  if (process.env.ANTHROPIC_API_KEY) return `Claude · ${process.env.AI_MODEL || 'claude-haiku-4-5-20251001'}`
+  if (process.env.AI_API_KEY && process.env.AI_BASE_URL) {
+    let host = process.env.AI_BASE_URL
+    try { host = new URL(process.env.AI_BASE_URL).host } catch {}
+    return `${process.env.AI_MODEL || '(falta AI_MODEL)'} · ${host}`
+  }
+  return null
+}
 
 /** Llamada genérica al modelo. Devuelve null si no hay clave o si falla. */
 async function preguntar(sistema: string, usuario: string, maxTokens: number, modelo?: string): Promise<string | null> {
-  const clave = process.env.ANTHROPIC_API_KEY
-  if (!clave) return null
-  const base = (process.env.AI_BASE_URL || 'https://api.anthropic.com').replace(/\/$/, '')
+  if (!iaDisponible()) return null
   try {
+    if (modoOpenAI()) {
+      const base = process.env.AI_BASE_URL!.replace(/\/$/, '')
+      const r = await fetch(`${base}/chat/completions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.AI_API_KEY}` },
+        body: JSON.stringify({
+          model: modelo || process.env.AI_MODEL,
+          max_tokens: maxTokens,
+          temperature: 0.2,
+          messages: [
+            { role: 'system', content: sistema },
+            { role: 'user', content: usuario },
+          ],
+        }),
+        signal: AbortSignal.timeout(25000),
+      })
+      if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`)
+      const j = await r.json()
+      return String(j.choices?.[0]?.message?.content ?? '').trim() || null
+    }
+    const base = (process.env.AI_BASE_URL || 'https://api.anthropic.com').replace(/\/$/, '')
     const r = await fetch(`${base}/v1/messages`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': clave, 'anthropic-version': '2023-06-01' },
+      headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: modelo || process.env.AI_MODEL || 'claude-haiku-4-5-20251001',
         max_tokens: maxTokens,
@@ -193,6 +229,74 @@ Respondé únicamente con un objeto JSON, sin texto adicional:
     const contenido = String(d.contenido ?? '').trim().slice(0, 20000)
     if (!titulo || !contenido) return null
     return { titulo, categoria: String(d.categoria ?? 'General').trim().slice(0, 60) || 'General', contenido }
+  } catch {
+    return null
+  }
+}
+
+export interface Recomendacion {
+  /** Qué parece ser, en una oración */
+  resumen: string
+  /** Cosas seguras para probar antes de enviar */
+  pasos: string[]
+  /** Datos que conviene sumar al pedido para resolverlo más rápido */
+  agregar: string[]
+  /** Posible incidente de seguridad: no probar nada, enviar ya */
+  seguridad: boolean
+  /** Índices (desde 1) de los artículos usados */
+  articulos: number[]
+}
+
+/**
+ * "¿Qué reviso antes?": recomendaciones para quien está por cargar un pedido.
+ * Combina los artículos de ayuda, lo que encontró la revisión del equipo (Accusys Cyber) y pasos generales seguros.
+ */
+export async function recomendarAntes(e: {
+  asunto: string
+  descripcion: string
+  categoria: string
+  hallazgos: string[]
+  articulos: { titulo: string; contenido: string }[]
+}): Promise<Recomendacion | null> {
+  const sistema = `Ayudás a una persona de Accusys que está por cargar un pedido en la mesa de ayuda (Accusys Desk). Antes de que lo envíe, le recomendás qué revisar y qué datos sumar para que se resuelva más rápido.
+
+La persona NO tiene permisos de administrador en su equipo. Usa Windows, Microsoft 365 (Outlook, Teams, OneDrive) y FortiClient para la VPN.
+
+Reglas:
+- "pasos": hasta 5 cosas concretas, seguras y reversibles que pueda hacer sola, en orden de probabilidad. Priorizá lo que dicen los artículos y lo que encontró la revisión de su equipo. Si no hay nada específico, usá pasos generales de soporte (reiniciar el equipo o el programa, revisar la conexión, cerrar sesión y volver a entrar, probar en el navegador, etc.).
+- Nunca sugieras: desactivar el antivirus, el firewall o la VPN; editar el registro; usar la consola o comandos; instalar o desinstalar programas; borrar archivos del sistema; compartir o anotar contraseñas; usar herramientas o sitios de terceros.
+- No inventes direcciones web, nombres de sistemas internos, teléfonos ni plazos.
+- Si parece un incidente de seguridad (virus, ransomware, archivos que cambiaron de nombre o no abren, correo sospechoso, cuenta usada por otra persona, pedido de contraseña): "seguridad": true y "pasos" solo con: no seguir usando el equipo o la cuenta, no apagarlo, desconectarlo de la red si hay archivos afectados, y enviar el pedido ya.
+- Si no es un problema sino un pedido (alta, permiso, acceso, compra, consulta), "pasos" va vacío.
+- "agregar": hasta 3 datos concretos que FALTAN en lo que escribió y que el equipo va a necesitar (mensaje de error exacto, desde cuándo pasa, si le pasa a otras personas, qué equipo, una captura). Si ya están, no los pidas.
+- "resumen": una oración sobre qué parece ser.
+- Español rioplatense, trato de "vos", frases cortas, sin markdown.
+
+${AVISO_DATOS}
+
+Respondé únicamente con un objeto JSON, sin texto adicional:
+{"resumen": "...", "pasos": ["..."], "agregar": ["..."], "seguridad": false, "articulos": [1]}
+("articulos": números de los artículos que usaste, o [] si ninguno)`
+
+  const usuario = [
+    `<pedido>\nTipo: ${e.categoria || 'sin elegir'}\nAsunto: ${e.asunto.slice(0, 300)}\n\n${e.descripcion.slice(0, 3000)}\n</pedido>`,
+    e.hallazgos.length ? `<revision_del_equipo>\n${e.hallazgos.map((h) => `- ${h}`).join('\n')}\n</revision_del_equipo>` : '',
+    e.articulos.length ? `<articulos>\n${e.articulos.map((a, i) => `## ${i + 1}. ${a.titulo}\n${a.contenido.slice(0, 2000)}`).join('\n\n')}\n</articulos>` : '',
+  ].filter(Boolean).join('\n\n')
+
+  const texto = await preguntar(sistema, usuario, 700, process.env.AI_MODEL_REDACCION)
+  try {
+    const bloque = texto?.match(/\{[\s\S]*\}/)
+    if (!bloque) return null
+    const d = JSON.parse(bloque[0])
+    const lista = (v: unknown, n: number) => (Array.isArray(v) ? v.map((x) => String(x).trim().slice(0, 300)).filter(Boolean).slice(0, n) : [])
+    return {
+      resumen: String(d.resumen ?? '').slice(0, 300),
+      pasos: lista(d.pasos, 5),
+      agregar: lista(d.agregar, 3),
+      seguridad: d.seguridad === true,
+      articulos: Array.isArray(d.articulos) ? d.articulos.map(Number).filter((n: number) => n >= 1 && n <= e.articulos.length) : [],
+    }
   } catch {
     return null
   }

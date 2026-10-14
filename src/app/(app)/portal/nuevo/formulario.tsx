@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { IMPACTOS, URGENCIAS, type Categoria } from '@/lib/tipos'
 import { pegarImagenes } from '@/components/pegar'
 import { campoFechaInput } from '@/lib/formato'
-import { asistente, crear } from './acciones'
+import { asistente, crear, seSoluciono, type Ayuda } from './acciones'
 import Diagnostico from './Diagnostico'
 
 export interface Inicial {
@@ -43,7 +43,8 @@ export default function Formulario({ categorias, inicial, enNombre = false }: { 
   const [b, setB] = useState<Borrador>({ ...VACIO, ...(inicial ?? {}) })
   const [recuperado, setRecuperado] = useState(false)
   const [version, setVersion] = useState(0)
-  const [ayuda, setAyuda] = useState<{ respuesta?: string; articulos: { id: string; titulo: string }[] } | null>(null)
+  const [ayuda, setAyuda] = useState<Ayuda | null>(null)
+  const formulario = useRef<HTMLFormElement>(null)
   const [buscando, iniciar] = useTransition()
   const [pegados, setPegados] = useState(0)
   const archivos = useRef<HTMLInputElement>(null)
@@ -87,7 +88,9 @@ export default function Formulario({ categorias, inicial, enNombre = false }: { 
 
   function buscarSolucion() {
     iniciar(async () => {
-      setAyuda(await asistente(b.asunto, b.descripcion))
+      // Si ya se mostró la revisión del equipo, la IA la tiene en cuenta
+      const diag = (formulario.current?.elements.namedItem('autoservicio_id') as HTMLInputElement | null)?.value ?? ''
+      setAyuda(await asistente(b.asunto, b.descripcion, b.categoriaId, diag))
     })
   }
 
@@ -96,6 +99,7 @@ export default function Formulario({ categorias, inicial, enNombre = false }: { 
   return (
     <form
       key={version}
+      ref={formulario}
       action={crear}
       onSubmit={() => {
         try {
@@ -206,17 +210,45 @@ export default function Formulario({ categorias, inicial, enNombre = false }: { 
 
       <div className="rounded-lg bg-canvas p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-ink/70">Antes de enviarlo, podemos buscar si ya hay una solución.</p>
+          <p className="text-sm text-ink/70">Antes de enviarlo: te decimos qué revisar y qué datos sumar para resolverlo más rápido.</p>
           <button type="button" onClick={buscarSolucion} disabled={!puedeBuscar || buscando} className="btn-sec px-3 py-1.5">
-            {buscando ? 'Buscando…' : 'Buscar una solución'}
+            {buscando ? 'Revisando…' : '¿Qué reviso antes?'}
           </button>
         </div>
         {ayuda && (
-          <div className="mt-3 space-y-2 border-t border-line/10 pt-3 text-sm" role="status">
-            {ayuda.respuesta && <p className="whitespace-pre-wrap leading-relaxed">{ayuda.respuesta}</p>}
-            {ayuda.articulos.length > 0 ? (
+          <div className="mt-3 space-y-3 border-t border-line/10 pt-3 text-sm" role="status">
+            {ayuda.id && <input type="hidden" name="asistente_id" value={ayuda.id} />}
+            {ayuda.recomendacion ? (
               <>
-                <p className="text-xs text-ink/50">{ayuda.respuesta ? 'Respuesta armada por IA con estos artículos:' : 'Estos artículos pueden servirte:'}</p>
+                {ayuda.recomendacion.seguridad && (
+                  <p className="rounded-lg bg-red-50 px-3 py-2 font-medium text-red-800">
+                    Puede ser un problema de seguridad: no sigas probando cosas y envialo ya. Si es un correo sospechoso, usá <Link href="/portal/phishing" className="underline">Reportar phishing</Link>.
+                  </p>
+                )}
+                {ayuda.recomendacion.resumen && <p className="text-ink/80">{ayuda.recomendacion.resumen}</p>}
+                {ayuda.recomendacion.pasos.length > 0 && (
+                  <div>
+                    <p className="font-medium">{ayuda.recomendacion.seguridad ? 'Mientras tanto:' : 'Probá esto:'}</p>
+                    <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-ink/80">
+                      {ayuda.recomendacion.pasos.map((p) => <li key={p}>{p}</li>)}
+                    </ol>
+                  </div>
+                )}
+                {ayuda.recomendacion.agregar.length > 0 && (
+                  <div className="rounded-lg bg-brand-50/60 px-3 py-2">
+                    <p className="font-medium text-brand-700">Si lo enviás, sumá en la descripción:</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-ink/80">
+                      {ayuda.recomendacion.agregar.map((x) => <li key={x}>{x}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </>
+            ) : (
+              ayuda.respuesta && <p className="whitespace-pre-wrap leading-relaxed">{ayuda.respuesta}</p>
+            )}
+            {ayuda.articulos.length > 0 && (
+              <div>
+                <p className="text-xs text-ink/50">Artículos de ayuda relacionados:</p>
                 <ul className="space-y-1">
                   {ayuda.articulos.map((a) => (
                     <li key={a.id}>
@@ -224,14 +256,23 @@ export default function Formulario({ categorias, inicial, enNombre = false }: { 
                     </li>
                   ))}
                 </ul>
-                <p className="pt-1">
-                  <Link href="/portal" onClick={descartar} className="font-medium text-brand-600 underline">Me sirvió, no hace falta el ticket</Link>
-                  <span className="text-ink/50"> · si no, seguí completando y envialo.</span>
-                </p>
-              </>
-            ) : (
-              <p className="text-ink/60">No encontramos nada sobre esto en la ayuda. Envianos el ticket y lo vemos.</p>
+              </div>
             )}
+            {!ayuda.recomendacion && !ayuda.respuesta && ayuda.articulos.length === 0 ? (
+              <p className="text-ink/60">No encontramos nada sobre esto en la ayuda. Envianos el pedido y lo vemos.</p>
+            ) : !ayuda.recomendacion?.seguridad && (
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1">
+                {ayuda.id ? (
+                  <button type="button" className="font-medium text-brand-600 underline" onClick={() => { descartar(); void seSoluciono(ayuda.id!) }}>
+                    Se solucionó, no hace falta el pedido
+                  </button>
+                ) : (
+                  <Link href="/portal" onClick={descartar} className="font-medium text-brand-600 underline">Me sirvió, no hace falta el pedido</Link>
+                )}
+                <span className="text-ink/50">· si no, seguí completando y envialo.</span>
+              </p>
+            )}
+            {ayuda.recomendacion && <p className="text-xs text-ink/40">Sugerencias generadas con IA a partir de la ayuda y de los datos de tu equipo. Revisalas con criterio.</p>}
           </div>
         )}
       </div>

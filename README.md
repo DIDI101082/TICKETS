@@ -116,6 +116,12 @@ Subir el contenido de esta carpeta a un repo, importarlo en Vercel y cargar las 
 - **Personas:** en Vercel cargar `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` y `AZURE_CLIENT_SECRET` (Secret) de una app de Entra con el permiso de aplicación `User.Read.All` y consentimiento de administrador. Opcional `ENTRA_DOMINIOS`. Se activa en Administración → Integraciones → Personas desde Entra ID: nombre, área, puesto y jefe se actualizan cada hora, y las cuentas deshabilitadas en Entra se desactivan (nunca un administrador).
 - **Ingreso con Microsoft:** en Supabase → Authentication → Providers → Azure, con el Client ID y un secreto de la app de Entra y la URL del tenant (`https://login.microsoftonline.com/<tenant-id>`). En la app de Entra, URI de redirección `https://<proyecto>.supabase.co/auth/v1/callback`. En Vercel, `NEXT_PUBLIC_MICROSOFT=1`.
 
+### IA (opcional)
+
+- **Gratis con Groq:** crear una clave en console.groq.com y cargar `AI_API_KEY`, `AI_BASE_URL=https://api.groq.com/openai/v1` y `AI_MODEL=llama-3.3-70b-versatile`.
+- **Claude (Anthropic):** `ANTHROPIC_API_KEY` (y opcional `AI_MODEL`). Si hay las dos, se usa Claude.
+- **Propia (Ollama, LiteLLM u otra compatible con OpenAI):** `AI_API_KEY`, `AI_BASE_URL` (terminada en `/v1`) y `AI_MODEL`.
+
 ### Actualizar una instalación existente
 
 Siempre en este orden: **primero** ejecutar el SQL nuevo en Supabase, **después** subir el código. Al revés, la app queda con errores hasta que se ejecute el SQL.

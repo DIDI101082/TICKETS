@@ -4,6 +4,7 @@ import { fecha } from '@/lib/formato'
 import { guardarMails } from '../acciones2'
 import Pruebas from './Pruebas'
 import Entra from './Entra'
+import { iaDescripcion, iaDisponible } from '@/lib/ia'
 
 export default async function Integraciones({ searchParams }: { searchParams: Promise<{ entra?: string }> }) {
   const sp = await searchParams
@@ -11,7 +12,7 @@ export default async function Integraciones({ searchParams }: { searchParams: Pr
   const [mails, reporte, revision] = await Promise.all([leerMails(), leerReporte(), leerConfig<{ en: string }>('ultima_revision', { en: '' })])
   const e = process.env
   const filas: { nombre: string; ok: boolean; detalle: string }[] = [
-    { nombre: 'Derivación, borradores y resúmenes con IA', ok: !!e.ANTHROPIC_API_KEY, detalle: e.ANTHROPIC_API_KEY ? `Modelo: ${e.AI_MODEL || 'claude-haiku-4-5-20251001'}` : 'Falta ANTHROPIC_API_KEY' },
+    { nombre: 'Asistente, derivación y borradores con IA', ok: iaDisponible(), detalle: iaDescripcion() ?? 'Falta ANTHROPIC_API_KEY, o AI_API_KEY + AI_BASE_URL + AI_MODEL (por ejemplo Groq, gratis)' },
     { nombre: 'Envío de mails', ok: !!(e.RESEND_API_KEY && e.EMAIL_FROM), detalle: e.RESEND_API_KEY && e.EMAIL_FROM ? `Remitente: ${e.EMAIL_FROM}` : 'Faltan RESEND_API_KEY y EMAIL_FROM' },
     { nombre: 'Avisos al canal de Teams', ok: !!e.TEAMS_WEBHOOK_URL, detalle: e.TEAMS_WEBHOOK_URL ? 'Configurado' : 'Falta TEAMS_WEBHOOK_URL' },
     { nombre: 'Avisos por Teams a cada persona', ok: !!e.TEAMS_USUARIO_WEBHOOK_URL, detalle: e.TEAMS_USUARIO_WEBHOOK_URL ? 'Configurado' : 'Falta TEAMS_USUARIO_WEBHOOK_URL' },

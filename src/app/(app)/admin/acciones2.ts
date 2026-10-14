@@ -201,7 +201,7 @@ export async function probar(_previo: string | null, form: FormData): Promise<st
   const { perfil } = await exigirAdmin()
   const cual = String(form.get('cual'))
   if (cual === 'ia') {
-    if (!iaDisponible()) return 'IA: falta cargar ANTHROPIC_API_KEY.'
+    if (!iaDisponible()) return 'IA: falta cargar ANTHROPIC_API_KEY, o AI_API_KEY + AI_BASE_URL + AI_MODEL.'
     const { data: sectores } = await admin().from('sectores').select('id,nombre,descripcion').eq('activo', true)
     const r = await clasificar('No puedo conectarme a la VPN desde casa', 'Me pide usuario y contraseña y dice que son incorrectos.', sectores ?? [])
     return r.sugerido ? `IA: respondió. Para un pedido de prueba sobre VPN sugirió "${r.sugerido}" con ${Math.round((r.confianza ?? 0) * 100)}% de confianza.` : `IA: no respondió (${r.motivo}). Revisá la clave y el modelo.`
