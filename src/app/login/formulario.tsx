@@ -58,6 +58,25 @@ export default function Formulario({ microsoft }: { microsoft: boolean }) {
     })
   }
 
+  // Como en Accusys Cyber: con Microsoft activado, se entra solo con la cuenta de Accusys (Entra ID).
+  // El formulario de email queda únicamente si el ingreso con Microsoft no está configurado.
+  if (microsoft) {
+    return (
+      <div className="space-y-4">
+        <button type="button" onClick={conMicrosoft} className="flex w-full items-center justify-center gap-3 rounded-xl bg-white py-3.5 font-medium text-[#1F2937] shadow-lg shadow-black/10 transition hover:bg-white/95">
+          <svg width="20" height="20" viewBox="0 0 21 21" aria-hidden="true">
+            <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+            <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+            <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+            <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+          </svg>
+          Ingresar con Microsoft
+        </button>
+        <p className="text-center text-xs text-white/60">Usá tu cuenta de Accusys (la misma del correo y Teams).</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       {microsoft && (

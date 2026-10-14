@@ -80,7 +80,7 @@ begin
   end if;
 
   -- 1. Copia nueva de Entra
-  delete from entra_usuarios;
+  delete from entra_usuarios where true;   -- Supabase exige WHERE en los DELETE que llegan por la API
   insert into entra_usuarios (entra_id, email, nombre, area, puesto, jefe_entra_id, activo)
   select distinct on (x ->> 'entra_id')
          x ->> 'entra_id', lower(x ->> 'email'), coalesce(x ->> 'nombre', ''), coalesce(x ->> 'area', ''),
